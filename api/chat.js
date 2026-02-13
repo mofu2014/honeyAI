@@ -12,14 +12,13 @@ export default async function handler(req, res) {
         "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({
-        model: "llama3-8b-8192",
-        messages: [
-          { role: "system", content: "あなたは優秀なAIです。" },
-          { role: "user", content: message }
-        ]
-      })
-    });
+body: JSON.stringify({
+  model: "llama-3.1-8b-instant",
+  messages: [
+    { role: "system", content: "あなたは優秀なAIです。" },
+    { role: "user", content: message }
+  ]
+});
 
     const data = await response.json();
 

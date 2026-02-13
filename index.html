@@ -14,21 +14,27 @@
   <div id="output"></div>
 
   <script>
-    async function sendMessage() {
-      const message = document.getElementById("input").value;
+async function sendMessage() {
+  const message = document.getElementById("input").value;
 
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message })
-      });
+  const res = await fetch("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message })
+  });
 
-const data = await res.json();
+  const text = await res.text(); // まず text で受ける
 
-document.getElementById("output").innerText =
-  JSON.stringify(data, null, 2);
+  try {
+    const data = JSON.parse(text);
+    document.getElementById("output").innerText =
+      JSON.stringify(data, null, 2);
+  } catch {
+    document.getElementById("output").innerText =
+      "JSON解析失敗:\n" + text;
+  }
+}
 
-    }
   </script>
 </body>
 </html>

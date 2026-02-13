@@ -1,21 +1,118 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>Groq AI</title>
+<meta charset="UTF-8">
+<title>honeyAI</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: linear-gradient(135deg, #ffb347, #ffcc33);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100vh;
+}
+
+h1 {
+  margin-top: 20px;
+  color: white;
+  text-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+}
+
+.chat-box {
+  width: 90%;
+  max-width: 600px;
+  background: white;
+  border-radius: 15px;
+  padding: 20px;
+  margin-top: 20px;
+  overflow-y: auto;
+  height: 60vh;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}
+
+.message {
+  margin: 10px 0;
+  padding: 10px 15px;
+  border-radius: 20px;
+  max-width: 70%;
+}
+
+.user {
+  background: #ffd966;
+  align-self: flex-end;
+  margin-left: auto;
+}
+
+.ai {
+  background: #f1f1f1;
+  align-self: flex-start;
+}
+
+.input-area {
+  margin: 15px;
+  display: flex;
+  gap: 10px;
+}
+
+textarea {
+  flex: 1;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+button {
+  background: #ff9900;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 10px;
+  color: white;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #ff7f00;
+}
+
+img {
+  max-width: 100%;
+  margin-top: 10px;
+  border-radius: 10px;
+}
+</style>
 </head>
+
 <body>
-  <h1>Groq AI</h1>
 
-  <textarea id="input" rows="4" cols="50"></textarea><br>
+<h1>🍯 honeyAI</h1>
+
+<div class="chat-box" id="chat"></div>
+
+<div class="input-area">
+  <textarea id="input" rows="2"></textarea>
   <button onclick="sendMessage()">送信</button>
+  <button onclick="generateImage()">画像</button>
+</div>
 
-  <h3>AIの返答:</h3>
-  <div id="output"></div>
+<script>
+function addMessage(text, type) {
+  const chat = document.getElementById("chat");
+  const div = document.createElement("div");
+  div.className = "message " + type;
+  div.innerText = text;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
 
-  <script>
 async function sendMessage() {
-  const message = document.getElementById("input").value;
+  const input = document.getElementById("input");
+  const message = input.value;
+  if (!message) return;
+
+  addMessage(message, "user");
+  input.value = "";
 
   const res = await fetch("/api/chat", {
     method: "POST",
@@ -23,18 +120,34 @@ async function sendMessage() {
     body: JSON.stringify({ message })
   });
 
-  const text = await res.text(); // まず text で受ける
+  const data = await res.json();
+  const reply = data.choices[0].message.content;
 
-  try {
-    const data = JSON.parse(text);
-    document.getElementById("output").innerText =
-      JSON.stringify(data, null, 2);
-  } catch {
-    document.getElementById("output").innerText =
-      "JSON解析失敗:\n" + text;
-  }
+  addMessage(reply, "ai");
 }
 
-  </script>
+async function generateImage() {
+  const input = document.getElementById("input").value;
+  if (!input) return;
+
+  addMessage("画像生成中...", "ai");
+
+  const res = await fetch("/api/image", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt: input })
+  });
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+
+  const chat = document.getElementById("chat");
+  const img = document.createElement("img");
+  img.src = url;
+  chat.appendChild(img);
+  chat.scrollTop = chat.scrollHeight;
+}
+</script>
+
 </body>
 </html>

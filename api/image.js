@@ -24,6 +24,14 @@ export default async function handler(req, res) {
     }
   );
 
+  const contentType = response.headers.get("content-type");
+
+  if (!contentType.includes("image")) {
+    const errorText = await response.text();
+    console.log("HF ERROR:", errorText);
+    return res.status(500).json({ error: errorText });
+  }
+
   const buffer = await response.arrayBuffer();
   res.setHeader("Content-Type", "image/png");
   res.status(200).send(Buffer.from(buffer));

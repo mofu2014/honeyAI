@@ -4,43 +4,45 @@ export default async function handler(req, res) {
       return res.status(405).json({ error: "Method not allowed" });
     }
 
-    if (!process.env.HF_API_KEY) {
-      return res.status(500).json({ error: "HF_API_KEY missing" });
+    if (!process.env.GROQ_API_KEY) {
+      return res.status(500).json({ error: "GROQ_API_KEY missing" });
     }
 
     const { prompt } = req.body;
 
     const response = await fetch(
-      "https://router.huggingface.co/hf-inference/models/mistralai/Mistral-7B-Instruct-v0.2",
+      "https://api.groq.com/openai/v1/chat/completions",
       {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${process.env.HF_API_KEY}`,
+          "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          inputs: prompt,
-          parameters: {
-            max_new_tokens: 300,
-            temperature: 0.8,
-            return_full_text: false
-          }
+          model: "llama-3.3-70b-versatile",
+          messages: [
+            {
+              role: "system",
+              content: "You are HoneyAI. Always maintain personality consistency."
+            },
+            {
+              role: "user",
+              content: prompt
+            }
+          ],
+          temperature: 0.8
         })
       }
     );
 
+    const data = await response.json();
+
     if (!response.ok) {
-      const errorText = await response.text();
-      return res.status(500).json({ error: errorText });
+      return res.status(500).json({ error: data });
     }
 
-    const result = await response.json();
-
-    let reply = "...";
-
-    if (Array.isArray(result) && result[0]?.generated_text) {
-      reply = result[0].generated_text;
-    }
+    const reply =
+      data.choices?.[0]?.message?.content || "...";
 
     res.status(200).json({ reply });
 

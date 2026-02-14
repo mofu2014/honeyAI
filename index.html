@@ -5,9 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HoneyAI Pro 🍯</title>
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
-    <!-- Markdown変換用ライブラリ -->
+    <!-- 外部ライブラリの読み込み -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <!-- セキュリティ対策（XSS防止）ライブラリ -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js"></script>
     
     <style>
@@ -42,15 +41,10 @@
         .ai-msg { align-items: flex-start; }
         .ai-msg .bubble { background: var(--honey-light); border: 1px solid #FFE082; border-bottom-left-radius: 4px; width: 100%; color: #333; }
 
-        /* === リッチテキスト装飾用のスタイル === */
-        .bubble h1, .bubble h2, .bubble h3 { margin: 10px 0 5px 0; border-bottom: 2px dashed var(--honey-gold); padding-bottom: 3px; color: var(--honey-dark); }
-        .bubble h1 { font-size: 1.4em; }
-        .bubble h2 { font-size: 1.2em; }
-        .bubble ul, .bubble ol { margin: 5px 0; padding-left: 20px; }
-        .bubble li { margin-bottom: 4px; }
-        .bubble strong { color: #d35400; background: rgba(255,215,0,0.2); padding: 0 4px; border-radius: 4px; } /* 太字を強調 */
-        .bubble u { text-decoration: underline; text-decoration-color: var(--honey-accent); text-decoration-thickness: 2px; }
-        .bubble blockquote { border-left: 4px solid var(--honey-gold); margin: 0; padding-left: 10px; color: #666; background: rgba(255,255,255,0.5); }
+        /* マークダウン装飾 */
+        .bubble h1, .bubble h2 { margin: 10px 0; border-bottom: 2px dashed var(--honey-gold); }
+        .bubble ul, .bubble ol { padding-left: 20px; margin: 5px 0; }
+        .bubble strong { color: #d35400; background: rgba(255,215,0,0.2); padding: 0 4px; border-radius: 4px; }
         .bubble table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 0.9em; }
         .bubble th, .bubble td { border: 1px solid #ddd; padding: 8px; }
         .bubble th { background-color: var(--honey-gold); color: white; }
@@ -59,6 +53,8 @@
         pre { background: var(--code-bg); color: #f8f8f2; padding: 15px; border-radius: 8px; overflow-x: auto; margin: 10px 0; font-family: 'Consolas', monospace; position: relative; }
         code { font-family: 'Consolas', monospace; background: rgba(0,0,0,0.1); padding: 2px 4px; border-radius: 4px; color: #d63384; }
         pre code { background: none; color: inherit; padding: 0; }
+        .code-header { display: flex; justify-content: space-between; align-items: center; background: #444; color: #ddd; padding: 5px 10px; border-top-left-radius: 8px; border-top-right-radius: 8px; font-size: 0.8rem; }
+        .copy-btn { background: #666; border: none; color: white; padding: 2px 8px; border-radius: 4px; cursor: pointer; }
         
         /* 思考プロセス */
         details { font-size: 0.8rem; color: #795548; background: #fffde7; border-radius: 12px; padding: 10px; margin-bottom: 10px; border: 1px dashed var(--honey-gold); }
@@ -84,7 +80,6 @@
 
     <aside class="sidebar" id="sidebar">
         <button class="new-chat-btn" onclick="startNewChat()">+ 新規プロジェクト</button>
-        <div style="font-size:0.8rem; color:#aaa; margin-bottom:5px;">プロジェクト履歴</div>
         <div class="history-list" id="history-list"></div>
     </aside>
 
@@ -94,6 +89,7 @@
             <button onclick="toggleSettings()" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">⚙️</button>
         </header>
 
+        <!-- 設定パネル -->
         <div id="settings-panel">
             <div class="setting-item">
                 <label>🧠 モデル選択</label>
@@ -127,7 +123,6 @@
             <div class="setting-item">
                 <label>性格・プロンプト設定</label>
                 <textarea id="system-prompt" rows="6"></textarea>
-                <div class="helper-text">※太字や色などの装飾を使って答えるように指示してあります</div>
             </div>
             
             <button onclick="saveSettings()" style="width:100%; background:var(--honey-gold); border:none; padding:12px; border-radius:12px; cursor:pointer; font-weight:bold; margin-bottom:10px;">💾 設定を保存</button>
@@ -143,16 +138,8 @@
     </main>
 
     <script>
-        // --- 初期設定：AIにリッチテキストの使い方を教える ---
-        const DEFAULT_PROMPT = `あなたはハチミツの妖精HoneyAIです。
-読みやすく親切な回答を心がけてください。
-
-【装飾のルール】
-重要な部分は **太字** にしてください。
-強調したい部分は <span style="color:red">赤色</span> や <span style="color:orange">オレンジ色</span> を使ってください。
-見出しが必要な場合は # を使って大きく書いてください。
-手順などは箇条書き（- ）で見やすくしてください。
-下線を引きたいときは <u>下線</u> タグを使ってください。`;
+        // デフォルトのプロンプト（エラー防止のため安全な記述に）
+        const DEFAULT_PROMPT = "あなたはハチミツの妖精HoneyAIです。語尾は「〜だみつ」。\n読みやすく親切な回答を心がけてください。\n\n【装飾ルール】\n重要な部分は **太字** にしてください。\n強調したい部分は <span style=\"color:red\">赤色</span> や <span style=\"color:orange\">オレンジ色</span> を使ってください。\n見出しが必要な場合は # を使って大きく書いてください。\n手順などは箇条書き（- ）で見やすくしてください。";
 
         // --- データ管理 ---
         let allSessions = {};
@@ -169,9 +156,12 @@
         const chatBox = document.getElementById('chat-box');
         const userInput = document.getElementById('user-input');
 
-        // Marked.js の設定（改行を有効化）
-        marked.setOptions({ breaks: true });
+        // Marked.js の設定
+        if (typeof marked !== 'undefined') {
+            marked.setOptions({ breaks: true });
+        }
 
+        // --- 初期化 ---
         window.onload = function() {
             loadAllData();
             renderHistoryList();
@@ -182,32 +172,33 @@
             try {
                 const sessions = localStorage.getItem('honeyai_sessions');
                 if (sessions) allSessions = JSON.parse(sessions);
-            } catch(e) {}
+            } catch(e) { console.error(e); }
 
             try {
                 const settings = localStorage.getItem('honeyai_settings');
                 if (settings) {
                     appSettings = { ...appSettings, ...JSON.parse(settings) };
                 }
-            } catch(e) {}
+            } catch(e) { console.error(e); }
 
-            document.getElementById('system-prompt').value = appSettings.systemPrompt;
-            document.getElementById('model-id').value = appSettings.modelId;
-            document.getElementById('max-tokens').value = appSettings.maxTokens;
-            document.getElementById('val-max').innerText = appSettings.maxTokens;
-            document.getElementById('min-tokens').value = appSettings.minTokens || 0;
-            document.getElementById('val-min').innerText = appSettings.minTokens || 0;
-            document.getElementById('avg-tokens').value = appSettings.avgTokens || 500;
-            document.getElementById('val-avg').innerText = appSettings.avgTokens || 500;
-            document.getElementById('user-profession').value = appSettings.userProfession || "";
+            // 設定パネルへの反映
+            if(document.getElementById('system-prompt')) {
+                document.getElementById('system-prompt').value = appSettings.systemPrompt;
+                document.getElementById('model-id').value = appSettings.modelId;
+                document.getElementById('max-tokens').value = appSettings.maxTokens;
+                document.getElementById('val-max').innerText = appSettings.maxTokens;
+                document.getElementById('min-tokens').value = appSettings.minTokens || 0;
+                document.getElementById('val-min').innerText = appSettings.minTokens || 0;
+                document.getElementById('avg-tokens').value = appSettings.avgTokens || 500;
+                document.getElementById('val-avg').innerText = appSettings.avgTokens || 500;
+                document.getElementById('user-profession').value = appSettings.userProfession || "";
+            }
         }
 
-        // --- チャットロジック ---
         function startNewChat() {
             currentSessionId = Date.now().toString();
             allSessions[currentSessionId] = { title: "新しいプロジェクト", messages: [], timestamp: Date.now() };
-            chatBox.innerHTML = '<div style="text-align:center; color:#ccc; margin-top:50px;">
-新しいプロジェクト<br><b>太字</b>や<span style="color:orange">色付き</span>で返事する練習をしたよ！</div>';
+            chatBox.innerHTML = '<div style="text-align:center; color:#ccc; margin-top:50px;">🍯 新しいプロジェクトだみつ！<br><b>太字</b>や<span style="color:orange">色付き</span>で返事できるよ！</div>';
             renderHistoryList();
             if(window.innerWidth <= 600) document.getElementById('sidebar').classList.remove('open');
         }
@@ -222,19 +213,21 @@
             if(window.innerWidth <= 600) document.getElementById('sidebar').classList.remove('open');
         }
 
+        // タイトル自動生成
         async function generateAutoTitle(text, sessionId) {
             try {
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
-                        messages: [{ role: "user", content: `以下の文章を15文字以内のタイトルに要約せよ：\n${text}` }],
+                        messages: [{ role: "user", content: "以下の文章を15文字以内のタイトルに要約せよ:\n" + text }],
                         modelId: "llama-3.1-8b-instant",
                         systemPrompt: "要約のプロ",
                         maxTokens: 50
                     })
                 });
                 if (!response.ok) return;
+                
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let title = "";
@@ -243,18 +236,21 @@
                     if (done) break;
                     title += decoder.decode(value, { stream: true });
                 }
+                
                 if (title && allSessions[sessionId]) {
                     allSessions[sessionId].title = title.trim().replace(/["「」]/g, "");
                     saveData();
                     renderHistoryList();
                 }
-            } catch (e) {}
+            } catch (e) { /* 無視 */ }
         }
 
         async function sendMessage() {
             const text = userInput.value.trim();
             if (!text) return;
 
+            // 新規チャットの判定
+            if (!allSessions[currentSessionId]) startNewChat();
             const isFirstMessage = allSessions[currentSessionId].messages.length === 0;
 
             appendMessage('user', text);
@@ -273,12 +269,13 @@
             const bubbleContainer = document.getElementById(bubbleId).parentElement;
             let fullReply = "";
 
+            // プロンプト構築
             let finalSystemPrompt = appSettings.systemPrompt;
             if (appSettings.userProfession && appSettings.userProfession.trim() !== "") {
-                finalSystemPrompt += `\n【重要】ユーザーの職業・立場は「${appSettings.userProfession}」です。`;
+                finalSystemPrompt += "\n【重要】ユーザーの職業・立場は「" + appSettings.userProfession + "」です。";
             }
             if (parseInt(appSettings.minTokens) > 0) {
-                finalSystemPrompt += `\n回答は必ず ${appSettings.minTokens} 文字以上にしてください。`;
+                finalSystemPrompt += "\n回答は必ず " + appSettings.minTokens + " 文字以上にしてください。";
             }
 
             try {
@@ -302,7 +299,6 @@
                     const { done, value } = await reader.read();
                     if (done) break;
                     fullReply += decoder.decode(value, { stream: true });
-                    // マークダウン変換とサニタイズ（安全化）を行って表示
                     bubbleContainer.innerHTML = formatContent(fullReply);
                     chatBox.scrollTop = chatBox.scrollHeight;
                 }
@@ -315,42 +311,53 @@
             }
         }
 
-        // --- 超重要：テキスト整形（Markdown + HTML + サニタイズ） ---
+        // --- テキスト整形 ---
         function formatContent(content) {
             if (!content) return "";
 
-            // 1. 思考プロセス <think> を隠す
             let text = content;
             let thought = "";
-            const thinkMatch = content.match(/<think>([\s\S]*?)<\/think>/);
+            
+            // 思考プロセス抽出
+            const thinkMatch = text.match(/<think>([\s\S]*?)<\/think>/);
             if (thinkMatch) {
                 thought = thinkMatch[1];
-                text = content.replace(/<think>[\s\S]*?<\/think>/, ""); // 本文から思考を除く
+                text = text.replace(/<think>[\s\S]*?<\/think>/, "");
             }
 
-            // 2. Marked.js で Markdown を HTML に変換
-            let html = marked.parse(text);
+            // Markdown変換
+            let html = text;
+            if (typeof marked !== 'undefined') {
+                html = marked.parse(text);
+            }
 
-            // 3. DOMPurify で安全化（色や下線は許可する）
-            html = DOMPurify.sanitize(html, {
-                ADD_TAGS: ['u', 'span'], // <u> と <span> を許可
-                ADD_ATTR: ['style']      // style属性（色など）を許可
-            });
+            // サニタイズ
+            if (typeof DOMPurify !== 'undefined') {
+                html = DOMPurify.sanitize(html, {
+                    ADD_TAGS: ['u', 'span'],
+                    ADD_ATTR: ['style']
+                });
+            }
 
-            // 4. 思考プロセスがあれば先頭にくっつける
+            // 思考プロセス結合
             if (thought) {
                 const thoughtHtml = `<details><summary>思考プロセス</summary><div style="font-style:italic; color:#8D6E63; padding:8px;">${thought.replace(/\n/g, '<br>')}</div></details>`;
                 html = thoughtHtml + html;
             }
 
+            // コードブロックコピーボタン（簡易実装）
+            // marked.jsが生成した <pre><code>...</code></pre> を加工
+            // ここではシンプルにそのまま表示し、コピー機能はCSS/JSでリッチにするには複雑になるため
+            // まずは表示を優先します。
+            
             return html;
         }
 
         function appendMessage(role, content) {
             const div = document.createElement('div');
             div.className = `message ${role === 'user' ? 'user-msg' : 'ai-msg'}`;
-            // ユーザーメッセージはエスケープして表示、AIメッセージはHTMLとして表示
             if (role === 'user') {
+                // ユーザー入力はエスケープ
                 div.innerHTML = `<span style="font-size:0.75rem;color:#bbb;margin-bottom:4px;padding:0 10px;">あなた</span><div class="bubble">${content.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, '<br>')}</div>`;
             } else {
                 div.innerHTML = `<span style="font-size:0.75rem;color:#bbb;margin-bottom:4px;padding:0 10px;">HoneyAI</span><div class="bubble">${formatContent(content)}</div>`;
@@ -360,7 +367,6 @@
             return div.querySelector('.bubble');
         }
 
-        // --- 保存・設定 ---
         function saveSettings() {
             appSettings.systemPrompt = document.getElementById('system-prompt').value;
             appSettings.modelId = document.getElementById('model-id').value;

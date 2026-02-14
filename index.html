@@ -4,218 +4,392 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HoneyAI 🍯</title>
-    <!-- 丸っこいフォントを読み込み -->
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --honey-dark: #8B4513;   /* 焦げ茶 */
-            --honey-gold: #FFD700;   /* 金色 */
-            --honey-light: #FFF8DC;  /* クリーム色 */
-            --honey-accent: #FFA500; /* オレンジ */
+            --honey-gold: #FFC107;   /* 濃い黄色 */
+            --honey-light: #FFF8E1;  /* 薄いクリーム */
+            --honey-accent: #FF9800; /* オレンジ */
+            --sidebar-bg: #FDF5E6;   /* サイドバー背景 */
         }
 
         body {
             font-family: 'M PLUS Rounded 1c', sans-serif;
             background-color: var(--honey-light);
-            color: var(--honey-dark);
             margin: 0;
-            padding: 20px;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            color: var(--honey-dark);
+        }
+
+        /* --- サイドバー（履歴エリア） --- */
+        .sidebar {
+            width: 260px;
+            background-color: var(--sidebar-bg);
+            border-right: 2px solid #FFE082;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
+            padding: 15px;
+            box-sizing: border-box;
+            transition: transform 0.3s ease;
         }
 
-        .container {
-            width: 100%;
-            max-width: 600px;
-            background: white;
+        .new-chat-btn {
+            background-color: var(--honey-gold);
+            color: var(--honey-dark);
+            border: none;
+            padding: 12px;
             border-radius: 20px;
-            box-shadow: 0 8px 16px rgba(255, 165, 0, 0.2);
-            overflow: hidden;
-            border: 4px solid var(--honey-gold);
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: 0.2s;
+        }
+        .new-chat-btn:hover {
+            background-color: var(--honey-accent);
+            color: white;
+            transform: translateY(-2px);
         }
 
-        /* ヘッダー */
+        .history-list {
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 10px;
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 0.9rem;
+            color: #666;
+            transition: 0.2s;
+            position: relative;
+        }
+        .history-item:hover {
+            background-color: #FFF0B4;
+        }
+        .history-item.active {
+            background-color: #FFE082;
+            color: var(--honey-dark);
+            font-weight: bold;
+        }
+        
+        .delete-btn {
+            position: absolute;
+            right: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #aaa;
+            cursor: pointer;
+            display: none;
+        }
+        .history-item:hover .delete-btn {
+            display: block;
+        }
+        .delete-btn:hover {
+            color: red;
+        }
+
+        /* --- メインコンテンツ --- */
+        .main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background-color: white;
+        }
+
         header {
-            background: linear-gradient(135deg, var(--honey-gold), var(--honey-accent));
             padding: 15px;
             text-align: center;
-            color: white;
-            font-size: 1.5rem;
             font-weight: bold;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+            font-size: 1.2rem;
+            border-bottom: 1px solid #eee;
+            color: var(--honey-accent);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        /* 設定エリア */
-        .settings {
-            background: #fffbe6;
-            padding: 15px;
-            border-bottom: 2px dashed var(--honey-gold);
+        /* 設定アイコン */
+        .settings-toggle {
+            cursor: pointer;
+            font-size: 1.2rem;
+            background: none;
+            border: none;
         }
-        .settings label {
-            font-weight: bold;
-            display: block;
-            margin-bottom: 5px;
-            font-size: 0.9rem;
-        }
-        .settings input {
-            width: 95%;
-            padding: 8px;
+        #settings-panel {
+            display: none;
+            position: absolute;
+            top: 60px;
+            right: 20px;
+            background: white;
             border: 2px solid var(--honey-gold);
+            padding: 15px;
             border-radius: 10px;
-            outline: none;
-            color: var(--honey-dark);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            width: 300px;
         }
 
         /* チャットエリア */
         #chat-box {
-            height: 400px;
-            overflow-y: auto;
+            flex-grow: 1;
             padding: 20px;
-            background-image: radial-gradient(var(--honey-light) 20%, transparent 20%),
-                              radial-gradient(var(--honey-light) 20%, transparent 20%);
+            overflow-y: auto;
+            background-image: radial-gradient(#FFF8E1 20%, transparent 20%);
             background-size: 20px 20px;
-            background-position: 0 0, 10px 10px;
         }
 
         .message {
-            margin-bottom: 15px;
+            margin-bottom: 20px;
             display: flex;
             flex-direction: column;
         }
-        
-        /* 吹き出しのデザイン */
         .bubble {
-            max-width: 80%;
-            padding: 10px 15px;
-            border-radius: 15px;
-            line-height: 1.5;
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            line-height: 1.6;
             font-size: 0.95rem;
             position: relative;
+            word-wrap: break-word;
         }
-
-        .user-msg {
-            align-self: flex-end;
-        }
+        .user-msg { align-items: flex-end; }
         .user-msg .bubble {
             background-color: var(--honey-accent);
             color: white;
-            border-bottom-right-radius: 2px;
+            border-bottom-right-radius: 4px;
         }
-
-        .ai-msg {
-            align-self: flex-start;
-        }
+        .ai-msg { align-items: flex-start; }
         .ai-msg .bubble {
-            background-color: var(--honey-gold);
+            background-color: var(--honey-light);
+            border: 1px solid #FFE082;
             color: var(--honey-dark);
-            border-bottom-left-radius: 2px;
+            border-bottom-left-radius: 4px;
         }
-
         .sender-name {
             font-size: 0.75rem;
             margin-bottom: 4px;
-            color: #aaa;
+            color: #bbb;
+            margin-left: 5px;
+            margin-right: 5px;
         }
 
         /* 入力エリア */
         .input-area {
-            padding: 15px;
+            padding: 20px;
             background: white;
-            border-top: 2px solid var(--honey-gold);
+            border-top: 1px solid #eee;
             display: flex;
             gap: 10px;
+            align-items: center;
         }
         #user-input {
             flex-grow: 1;
-            padding: 10px;
+            padding: 12px;
             border: 2px solid #ddd;
-            border-radius: 20px;
+            border-radius: 25px;
             outline: none;
-            transition: border-color 0.3s;
+            font-size: 1rem;
+            transition: 0.3s;
         }
         #user-input:focus {
-            border-color: var(--honey-accent);
+            border-color: var(--honey-gold);
         }
-        button {
-            background-color: var(--honey-dark);
-            color: white;
+        .send-btn {
+            background-color: var(--honey-gold);
             border: none;
-            padding: 10px 20px;
-            border-radius: 20px;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
             cursor: pointer;
-            font-weight: bold;
-            transition: transform 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.2rem;
+            transition: 0.2s;
         }
-        button:active {
-            transform: scale(0.95);
+        .send-btn:hover {
+            transform: scale(1.1);
         }
 
-        /* 保存・削除ボタンエリア */
-        .toolbar {
-            padding: 10px;
-            display: flex;
-            justify-content: space-around;
-            background: #fff8e1;
-            font-size: 0.8rem;
+        /* スマホ対応 */
+        @media (max-width: 600px) {
+            .sidebar {
+                position: absolute;
+                height: 100%;
+                z-index: 1000;
+                transform: translateX(-100%);
+                box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            }
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            .menu-btn {
+                display: block;
+                margin-right: 10px;
+                cursor: pointer;
+            }
         }
-        .tool-btn {
-            background: none;
-            color: var(--honey-dark);
-            border: 1px solid var(--honey-dark);
-            padding: 5px 10px;
-            border-radius: 10px;
-        }
-        .tool-btn:hover {
-            background: var(--honey-gold);
-            border-color: var(--honey-gold);
-            color: white;
+        @media (min-width: 601px) {
+            .menu-btn { display: none; }
         }
 
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <header>🍯 HoneyAI Chat</header>
-        
-        <!-- 性格設定エリア -->
-        <div class="settings">
-            <label>🤖 性格・設定 (System Prompt)</label>
-            <input type="text" id="system-prompt" value="あなたは魔法の国のハチミツの妖精です。語尾に「～だみつ」をつけて、甘く優しく話してください。">
+    <!-- サイドバー -->
+    <aside class="sidebar" id="sidebar">
+        <button class="new-chat-btn" onclick="startNewChat()">
+            <span>+</span> 新しいチャット
+        </button>
+        <div style="font-size:0.8rem; color:#aaa; margin-bottom:5px;">最近の履歴</div>
+        <div class="history-list" id="history-list">
+            <!-- ここに履歴が追加されます -->
+        </div>
+    </aside>
+
+    <!-- メインコンテンツ -->
+    <main class="main-content">
+        <header>
+            <div style="display:flex; align-items:center;">
+                <span class="menu-btn" onclick="toggleSidebar()">☰</span>
+                <span>🍯 HoneyAI</span>
+            </div>
+            <button class="settings-toggle" onclick="toggleSettings()">⚙️</button>
+        </header>
+
+        <!-- 設定パネル -->
+        <div id="settings-panel">
+            <label style="font-weight:bold; display:block; margin-bottom:5px;">性格設定</label>
+            <textarea id="system-prompt" rows="3" style="width:100%; border:1px solid #ccc; border-radius:5px; padding:5px;">あなたは魔法の国のハチミツの妖精です。語尾に「～だみつ」をつけて話してください。</textarea>
+            <button onclick="toggleSettings()" style="margin-top:10px; width:100%; background:var(--honey-gold); border:none; padding:5px; border-radius:5px; cursor:pointer;">閉じる</button>
         </div>
 
-        <!-- ツールバー -->
-        <div class="toolbar">
-            <button class="tool-btn" onclick="saveHistory()">💾 保存する</button>
-            <button class="tool-btn" onclick="loadHistory()">📂 読み込む</button>
-            <button class="tool-btn" onclick="clearHistory()">🗑️ 履歴削除</button>
+        <div id="chat-box">
+            <div style="text-align:center; color:#ccc; margin-top:50px;">
+                <div style="font-size:3rem;">🍯</div>
+                <p>何か話しかけてみてね！</p>
+            </div>
         </div>
 
-        <!-- チャット表示エリア -->
-        <div id="chat-box"></div>
-
-        <!-- 入力エリア -->
         <div class="input-area">
-            <input type="text" id="user-input" placeholder="メッセージを入力してね..." onkeypress="if(event.key === 'Enter') sendMessage()">
-            <button onclick="sendMessage()">送信</button>
+            <input type="text" id="user-input" placeholder="メッセージを入力..." onkeypress="if(event.key === 'Enter') sendMessage()">
+            <button class="send-btn" onclick="sendMessage()">➤</button>
         </div>
-    </div>
+    </main>
 
     <script>
-        // 会話履歴を保存する配列
-        let chatHistory = [];
+        // 全データの保存先（セッションIDをキーにしたオブジェクト）
+        let allSessions = JSON.parse(localStorage.getItem('honeyai_sessions')) || {};
+        
+        // 現在開いているセッションID
+        let currentSessionId = null;
 
         const chatBox = document.getElementById('chat-box');
         const userInput = document.getElementById('user-input');
         const systemPromptInput = document.getElementById('system-prompt');
+        const historyList = document.getElementById('history-list');
 
-        // 画面にメッセージを追加する関数
+        // --- 初期化処理 ---
+        window.onload = () => {
+            renderHistoryList();
+            startNewChat(); // 最初は新規チャット状態で開始
+        };
+
+        // --- 新しいチャットを開始 ---
+        function startNewChat() {
+            currentSessionId = Date.now().toString(); // 現在時刻をIDにする
+            allSessions[currentSessionId] = {
+                title: "新しいチャット",
+                messages: [],
+                timestamp: Date.now()
+            };
+            chatBox.innerHTML = `
+                <div style="text-align:center; color:#ccc; margin-top:50px;">
+                    <div style="font-size:3rem;">🍯</div>
+                    <p>新しい会話を始めるだみつ！</p>
+                </div>
+            `;
+            renderHistoryList();
+            // スマホならサイドバーを閉じる
+            if(window.innerWidth <= 600) document.getElementById('sidebar').classList.remove('open');
+        }
+
+        // --- メッセージ送信処理 ---
+        async function sendMessage() {
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            // 1. 初回メッセージならタイトルを更新
+            if (allSessions[currentSessionId].messages.length === 0) {
+                // 15文字以内でタイトルを作る
+                allSessions[currentSessionId].title = text.substring(0, 15) + (text.length > 15 ? "..." : "");
+                chatBox.innerHTML = ''; // 「何か話しかけて」の表示を消す
+                renderHistoryList();
+            }
+
+            // 2. 画面とデータに追加
+            appendMessage('user', text);
+            allSessions[currentSessionId].messages.push({ role: "user", content: text });
+            saveToLocalStorage(); // 保存
+            userInput.value = '';
+
+            // 3. ローディング表示
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = 'loading';
+            loadingDiv.innerHTML = '<span style="color:#aaa;">🍯 考え中...</span>';
+            loadingDiv.style.marginLeft = '20px';
+            chatBox.appendChild(loadingDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            try {
+                // 4. API送信
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        messages: allSessions[currentSessionId].messages, 
+                        systemPrompt: systemPromptInput.value 
+                    })
+                });
+
+                const data = await response.json();
+                document.getElementById('loading').remove();
+
+                const aiText = data.reply || "エラーだみつ...";
+                appendMessage('assistant', aiText);
+                
+                // 5. AIの返答も保存
+                allSessions[currentSessionId].messages.push({ role: "assistant", content: aiText });
+                saveToLocalStorage();
+
+            } catch (error) {
+                if(document.getElementById('loading')) document.getElementById('loading').remove();
+                appendMessage('assistant', '通信エラーだみつ...');
+            }
+        }
+
+        // --- 画面描画系 ---
         function appendMessage(role, text) {
             const div = document.createElement('div');
             div.classList.add('message', role === 'user' ? 'user-msg' : 'ai-msg');
-            
             const name = role === 'user' ? 'あなた' : 'HoneyAI';
             
             div.innerHTML = `
@@ -226,91 +400,73 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        // メッセージ送信
-        async function sendMessage() {
-            const text = userInput.value.trim();
-            if (!text) return;
+        // サイドバーのリスト更新
+        function renderHistoryList() {
+            historyList.innerHTML = '';
+            
+            // 日付順にソート（新しい順）
+            const sortedIds = Object.keys(allSessions).sort((a, b) => {
+                return allSessions[b].timestamp - allSessions[a].timestamp;
+            });
 
-            // 1. ユーザーのメッセージを表示・履歴に追加
-            appendMessage('user', text);
-            chatHistory.push({ role: "user", content: text });
-            userInput.value = '';
-
-            // 2. ロード中表示（簡易）
-            const loadingDiv = document.createElement('div');
-            loadingDiv.id = 'loading';
-            loadingDiv.textContent = '🍯 ハチミツを調合中...';
-            loadingDiv.style.textAlign = 'center';
-            loadingDiv.style.fontSize = '0.8rem';
-            loadingDiv.style.color = '#8B4513';
-            loadingDiv.style.marginTop = '10px';
-            chatBox.appendChild(loadingDiv);
-            chatBox.scrollTop = chatBox.scrollHeight;
-
-            try {
-                // 3. APIに履歴ごと送信
-                const response = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        messages: chatHistory, 
-                        systemPrompt: systemPromptInput.value // 設定された性格を送る
-                    })
-                });
-
-                if (!response.ok) throw new Error('Network error');
-                const data = await response.json();
-                
-                // ロード表示を消す
-                document.getElementById('loading').remove();
-
-                // 4. AIの返答を表示・履歴に追加
-                const aiText = data.reply;
-                appendMessage('assistant', aiText);
-                chatHistory.push({ role: "assistant", content: aiText });
-
-            } catch (error) {
-                document.getElementById('loading').remove();
-                appendMessage('assistant', '⚠️ エラーが発生しましただみつ...: ' + error.message);
-            }
+            sortedIds.forEach(id => {
+                const session = allSessions[id];
+                const item = document.createElement('div');
+                item.className = `history-item ${id === currentSessionId ? 'active' : ''}`;
+                item.onclick = () => loadSession(id);
+                item.innerHTML = `
+                    <span>💬 ${session.title}</span>
+                    <button class="delete-btn" onclick="deleteSession(event, '${id}')">×</button>
+                `;
+                historyList.appendChild(item);
+            });
         }
 
-        // --- 保存・読み込み機能 (LocalStorage) ---
-
-        function saveHistory() {
-            const saveData = {
-                history: chatHistory,
-                prompt: systemPromptInput.value
-            };
-            localStorage.setItem('honey_ai_data', JSON.stringify(saveData));
-            alert('🍯 会話と設定を保存したみつ！');
-        }
-
-        function loadHistory() {
-            const dataStr = localStorage.getItem('honey_ai_data');
-            if (!dataStr) {
-                alert('保存されたデータがないみたい...');
-                return;
-            }
-            const data = JSON.parse(dataStr);
+        // --- データ管理系 ---
+        
+        // 過去の会話を読み込む
+        function loadSession(id) {
+            currentSessionId = id;
+            const session = allSessions[id];
             
-            // データ復元
-            chatHistory = data.history || [];
-            systemPromptInput.value = data.prompt || "";
-            
-            // 画面リセット＆再描画
             chatBox.innerHTML = '';
-            chatHistory.forEach(msg => {
+            session.messages.forEach(msg => {
                 appendMessage(msg.role === 'user' ? 'user' : 'assistant', msg.content);
             });
-            alert('🍯 読み込み完了だみつ！');
+            
+            renderHistoryList();
+            // スマホならサイドバーを閉じる
+            if(window.innerWidth <= 600) document.getElementById('sidebar').classList.remove('open');
         }
 
-        function clearHistory() {
-            if(!confirm("本当に履歴を消しちゃうの？")) return;
-            chatHistory = [];
-            chatBox.innerHTML = '';
-            alert('履歴をリセットしました✨');
+        // 会話を削除
+        function deleteSession(event, id) {
+            event.stopPropagation(); // 親要素のクリックイベントを止める
+            if(!confirm("この会話を削除してもいい？")) return;
+            
+            delete allSessions[id];
+            saveToLocalStorage();
+            
+            // もし今開いている会話を消したら、新規チャットにする
+            if(id === currentSessionId) {
+                startNewChat();
+            } else {
+                renderHistoryList();
+            }
+        }
+
+        // ブラウザに保存
+        function saveToLocalStorage() {
+            localStorage.setItem('honeyai_sessions', JSON.stringify(allSessions));
+        }
+
+        // --- UI操作系 ---
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+        function toggleSettings() {
+            const panel = document.getElementById('settings-panel');
+            panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
         }
     </script>
 </body>

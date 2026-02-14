@@ -1,43 +1,50 @@
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method Not Allowed" });
-  }
-
   try {
-    let body = "";
+    if (req.method !== "POST") {
+      return res.status(405).json({ error: "Method not allowed" });
+    }
 
-    await new Promise((resolve, reject) => {
-      req.on("data", chunk => body += chunk);
-      req.on("end", resolve);
-      req.on("error", reject);
-    });
+    if (!process.env.HF_API_KEY) {
+      return res.status(500).json({ error: "HF_API_KEY missing" });
+    }
 
-    const { message } = JSON.parse(body);
+    const { prompt } = req.body;
 
     const response = await fetch(
-      "https://api.groq.com/openai/v1/chat/completions",
+      "https://router.huggingface.co/hf-inference/models/mistralai/Mistral-7B-Instruct-v0.2",
       {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
+          "Authorization": `Bearer ${process.env.HF_API_KEY}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: "llama-3.1-8b-instant",
-          messages: [
-            { role: "system", content: "あなたは優秀なAIです。" },
-            { role: "user", content: message }
-          ]
+          inputs: prompt,
+          parameters: {
+            max_new_tokens: 300,
+            temperature: 0.8,
+            return_full_text: false
+          }
         })
       }
     );
 
-    const data = await response.json();
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(500).json({ error: errorText });
+    }
 
-    return res.status(200).json(data);
+    const result = await response.json();
 
-  } catch (error) {
-    console.error("SERVER ERROR:", error);
-    return res.status(500).json({ error: error.message });
+    let reply = "...";
+
+    if (Array.isArray(result) && result[0]?.generated_text) {
+      reply = result[0].generated_text;
+    }
+
+    res.status(200).json({ reply });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 }

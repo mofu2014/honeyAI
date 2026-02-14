@@ -13,7 +13,8 @@ module.exports = async function handler(req, res) {
         return res.status(500).json({ error: 'APIキーが見つかりません。コード内の変数名とVercelの環境変数名(HF_API_KEY)が一致しているか確認してください。' });
     }
 
-const model = "CompVis/stable-diffusion-v1-4";
+// api/image.js の中で
+const model = "Sunanda-Das/new-text-to-image-v4.2";
 
     try {
         console.log(`Generating image for: ${prompt}`);

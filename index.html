@@ -157,8 +157,7 @@ function formatContent(content) {
                 const safePrompt = encodeURIComponent(cleanPrompt);
                 const seed = Math.floor(Math.random() * 1000000);
                 
-                // モデル指定(flux)を外すと、より繋がりやすい標準モデルになります
-                const url = `https://pollinations.ai/p/${safePrompt}?width=1024&height=1024&seed=${seed}`;
+const url = `https://pollinations.ai/prompt/${safePrompt}?width=1024&height=1024&seed=${seed}`;
                 
                 return `描けたよ！🍯<br><img src="${url}" alt="Generating Image..." onload="this.style.background='transparent'">`;
             });

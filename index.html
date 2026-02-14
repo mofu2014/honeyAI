@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HoneyAI Pro 🍯</title>
+    <title>HoneyAI</title>
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -55,7 +55,7 @@
         #settings-panel { display: none; position: absolute; top: 60px; right: 20px; background: white; border: 3px solid var(--honey-gold); padding: 20px; border-radius: 15px; z-index: 100; width: 320px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); max-height: 80vh; overflow-y: auto; }
         .setting-item { margin-bottom: 20px; }
         label { font-size: 0.85rem; font-weight: bold; display: block; margin-bottom: 5px; color: var(--honey-dark); }
-        select, textarea, input[type="range"] { width: 100%; padding: 8px; border-radius: 10px; border: 2px solid #eee; font-family: inherit; box-sizing: border-box; }
+        select, textarea, input[type="range"], input[type="text"] { width: 100%; padding: 8px; border-radius: 10px; border: 2px solid #eee; font-family: inherit; box-sizing: border-box; }
         .range-value { float: right; font-size: 0.8rem; color: var(--honey-accent); }
         .helper-text { font-size: 0.7rem; color: #999; margin-top: 2px; }
 
@@ -86,23 +86,27 @@
                 </select>
             </div>
 
+            <!-- 職業・立場の追加 -->
+            <div class="setting-item">
+                <label>👤 あなたの職業・立場</label>
+                <input type="text" id="user-profession" placeholder="例: 中学生、エンジニア、主婦...">
+                <div class="helper-text">AIがこれに合わせて説明の仕方を変えます</div>
+            </div>
+
             <!-- 文字数設定エリア -->
             <div class="setting-item">
                 <label>📉 最小文字数 (Minimum) <span id="val-min" class="range-value">0</span></label>
                 <input type="range" id="min-tokens" min="0" max="2000" step="50" value="0" oninput="document.getElementById('val-min').innerText = this.value">
-                <div class="helper-text">これ以上は喋るように頑張ります</div>
             </div>
 
             <div class="setting-item">
                 <label>🎯 平均目安 (Target) <span id="val-avg" class="range-value">500</span></label>
                 <input type="range" id="avg-tokens" min="100" max="4000" step="100" value="500" oninput="document.getElementById('val-avg').innerText = this.value">
-                <div class="helper-text">このくらいの長さが理想だみつ</div>
             </div>
 
             <div class="setting-item">
                 <label>📈 最大文字数 (Maximum) <span id="val-max" class="range-value">4096</span></label>
                 <input type="range" id="max-tokens" min="512" max="8192" step="512" value="4096" oninput="document.getElementById('val-max').innerText = this.value">
-                <div class="helper-text">これを超えたら強制終了します</div>
             </div>
 
             <div class="setting-item">
@@ -127,11 +131,12 @@
         let allSessions = {};
         // デフォルト設定
         let appSettings = {
-            systemPrompt: "あなたはハチミツの妖精HoneyAIです。語尾は「〜だみつ」。\nプログラミングの質問には、コードブロックを使って丁寧に答えてください。",
+            systemPrompt: "あなたはハチミツの妖精HoneyAIです。\nプログラミングの質問には、コードブロックを使って丁寧に答えてください。",
             modelId: "llama-3.3-70b-versatile",
             maxTokens: 4096,
             minTokens: 0,
-            avgTokens: 500
+            avgTokens: 500,
+            userProfession: "" // 職業設定を追加
         };
         let currentSessionId = null;
 
@@ -166,13 +171,14 @@
             document.getElementById('val-min').innerText = appSettings.minTokens || 0;
             document.getElementById('avg-tokens').value = appSettings.avgTokens || 500;
             document.getElementById('val-avg').innerText = appSettings.avgTokens || 500;
+            document.getElementById('user-profession').value = appSettings.userProfession || ""; // 職業を反映
         }
 
         // --- チャットロジック ---
         function startNewChat() {
             currentSessionId = Date.now().toString();
             allSessions[currentSessionId] = { title: "新しいプロジェクト", messages: [], timestamp: Date.now() };
-            chatBox.innerHTML = '<div style="text-align:center; color:#ccc; margin-top:50px;">🍯 新しいプロジェクトだみつ！</div>';
+            chatBox.innerHTML = '<div style="text-align:center; color:#ccc; margin-top:50px;">新しいプロジェクト</div>';
             renderHistoryList();
             if(window.innerWidth <= 600) document.getElementById('sidebar').classList.remove('open');
         }
@@ -202,22 +208,25 @@
             userInput.value = '';
 
             const bubbleId = 'B' + Date.now();
-            appendMessage('assistant', '<span id="'+bubbleId+'">🍯 思考中...</span>');
+            appendMessage('assistant', '<span id="'+bubbleId+'">思考中...</span>');
             const bubbleContainer = document.getElementById(bubbleId).parentElement;
             let fullReply = "";
 
-            // ★ここで「文字数指示」をプロンプトに追加するテクニック
+            // ★システムプロンプトの構築（職業設定を反映）
             let finalSystemPrompt = appSettings.systemPrompt;
             
-            // 最小文字数・平均文字数の指示を追加
-            let lengthInstruction = "";
+            // 職業・立場の指示を追加
+            if (appSettings.userProfession && appSettings.userProfession.trim() !== "") {
+                finalSystemPrompt += `\n【重要】ユーザーの職業・立場は「${appSettings.userProfession}」です。この背景を踏まえて、適切な専門レベルと言葉遣いで回答してください。`;
+            }
+
+            // 文字数指示を追加
             if (parseInt(appSettings.minTokens) > 0) {
-                lengthInstruction += `\n【重要】回答は必ず ${appSettings.minTokens} 文字以上にしてください。`;
+                finalSystemPrompt += `\n回答は必ず ${appSettings.minTokens} 文字以上にしてください。`;
             }
             if (parseInt(appSettings.avgTokens) > 0) {
-                lengthInstruction += `\n目標とする回答の長さは ${appSettings.avgTokens} 文字程度です。`;
+                finalSystemPrompt += `\n目標とする回答の長さは ${appSettings.avgTokens} 文字程度です。`;
             }
-            finalSystemPrompt += lengthInstruction;
 
             try {
                 const response = await fetch('/api/chat', {
@@ -225,7 +234,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         messages: allSessions[currentSessionId].messages, 
-                        systemPrompt: finalSystemPrompt, // 指示付きプロンプトを送信
+                        systemPrompt: finalSystemPrompt, // 合成したプロンプトを送信
                         modelId: appSettings.modelId,
                         maxTokens: appSettings.maxTokens
                     })
@@ -256,12 +265,10 @@
         function formatContent(content) {
             if (!content) return "";
 
-            // 1. <think>の処理
             let formatted = content.replace(/<think>([\s\S]*?)<\/think>/g, (match, thought) => {
                 return `<details><summary>思考プロセス</summary><div style="font-style:italic; color:#8D6E63; padding:8px;">${thought.replace(/\n/g, '<br>')}</div></details>`;
             });
 
-            // 2. コードブロック処理 (コピーボタン付き)
             formatted = formatted.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
                 const safeCode = code.replace(/</g, "&lt;").replace(/>/g, "&gt;");
                 return `
@@ -278,7 +285,6 @@
 
             formatted = formatted.replace(/\n/g, '<br>');
             
-            // preタグ内のbrを戻す
             formatted = formatted.replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/g, (match) => {
                 return match.replace(/<br>/g, '\n');
             });
@@ -302,16 +308,18 @@
             appSettings.maxTokens = document.getElementById('max-tokens').value;
             appSettings.minTokens = document.getElementById('min-tokens').value;
             appSettings.avgTokens = document.getElementById('avg-tokens').value;
+            appSettings.userProfession = document.getElementById('user-profession').value; // 職業を保存
             
             localStorage.setItem('honeyai_settings', JSON.stringify(appSettings));
-            alert('設定を保存したみつ！');
+            alert('設定を保存しました');
             toggleSettings();
         }
 
         function saveData() { localStorage.setItem('honeyai_sessions', JSON.stringify(allSessions)); }
 
         function renderHistoryList() {
-            const list = document.getElementById('history-list'); list.innerHTML = '';
+            const list = document.getElementById('history-list');
+            list.innerHTML = '';
             Object.keys(allSessions).sort((a,b) => allSessions[b].timestamp - allSessions[a].timestamp).forEach(id => {
                 const item = document.createElement('div');
                 item.className = `history-item ${id === currentSessionId ? 'active' : ''}`;
@@ -322,8 +330,10 @@
         }
 
         function deleteSession(e, id) {
-            e.stopPropagation(); if(!confirm("削除する？")) return;
-            delete allSessions[id]; saveData();
+            e.stopPropagation();
+            if(!confirm("このプロジェクトを削除する？")) return;
+            delete allSessions[id];
+            saveData();
             if(id === currentSessionId) startNewChat(); else renderHistoryList();
         }
 

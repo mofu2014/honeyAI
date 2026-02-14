@@ -22,7 +22,7 @@
         .history-item:hover .delete-btn { display: block; }
 
         /* メイン */
-        .main-content { flex-grow: 1; display: flex; flex-direction: column; background: white; }
+        .main-content { flex-grow: 1; display: flex; flex-direction: column; background: white; width: 100%; }
         header { padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; color: var(--honey-accent); font-weight: bold; }
         #chat-box { flex-grow: 1; padding: 20px; overflow-y: auto; background-image: radial-gradient(#FFF8E1 20%, transparent 20%); background-size: 20px 20px; }
         
@@ -33,7 +33,8 @@
         .user-msg .bubble { background: var(--honey-accent); color: white; border-bottom-right-radius: 4px; }
         .ai-msg { align-items: flex-start; }
         .ai-msg .bubble { background: var(--honey-light); border: 1px solid #FFE082; border-bottom-left-radius: 4px; }
-        .bubble img { width: 100%; border-radius: 10px; margin-top: 10px; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        /* 画像のスタイル */
+        .bubble img { width: 100%; max-width: 400px; border-radius: 10px; margin-top: 10px; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: block; }
 
         /* 入力 */
         .input-area { padding: 15px; border-top: 1px solid #eee; display: flex; gap: 10px; }
@@ -63,52 +64,164 @@
             <textarea id="system-prompt" rows="8" style="width:100%; font-size:0.75rem; margin-top:5px; padding:5px; border:1px solid #ccc; border-radius:5px;">あなたはハチミツの妖精HoneyAIです。語尾は「〜だみつ」。
 
 【画像生成のルール】
-ユーザーが「絵を描いて」等の依頼をしたら、必ず以下のMarkdown形式のみを出力して画像を生成してください。説明は不要です。
-![image](https://image.pollinations.ai/prompt/【依頼内容を英語にした詳細な説明】?width=1024&height=1024&nologo=true&seed=【ランダムな数字】)
+ユーザーから「絵を描いて」「画像を作って」等の依頼があった場合、言葉での説明は省略し、必ず以下のMarkdown形式のURLのみを出力してください。
+![image](https://image.pollinations.ai/prompt/【依頼内容を英語に翻訳した詳細なプロンプト】?width=1024&height=1024&nologo=true&seed=【ランダムな数字】)
 
-画像生成以外の時は普通に優しく喋ってください。</textarea>
+それ以外の会話は、優しく親切に日本語で答えてください。</textarea>
             <button onclick="toggleSettings()" style="width:100%; margin-top:10px; cursor:pointer;">設定を閉じる</button>
         </div>
 
         <div id="chat-box"></div>
 
         <div class="input-area">
-            <input type="text" id="user-input" placeholder="「猫の絵を描いて」など..." onkeypress="if(event.key === 'Enter') sendMessage()">
+            <input type="text" id="user-input" placeholder="メッセージを入力..." onkeypress="if(event.key === 'Enter') sendMessage()">
             <button class="send-btn" onclick="sendMessage()">➤</button>
         </div>
     </main>
 
     <script>
-        let allSessions = JSON.parse(localStorage.getItem('honeyai_sessions')) || {};
+        // ★ここを修正：データの読み込みエラーを防ぐ安全装置を追加
+        let allSessions = {};
+        try {
+            const saved = localStorage.getItem('honeyai_sessions');
+            if (saved) {
+                allSessions = JSON.parse(saved);
+            }
+        } catch (e) {
+            console.error("履歴データの読み込みに失敗しました:", e);
+            allSessions = {}; // 壊れていたらリセット
+        }
+
         let currentSessionId = null;
         const chatBox = document.getElementById('chat-box');
         const userInput = document.getElementById('user-input');
 
-        window.onload = () => { renderHistoryList(); startNewChat(); };
+        // ページ読み込み時にチャットを開始
+        window.onload = function() {
+            renderHistoryList();
+            startNewChat();
+        };
 
+        // 新しいチャットを開始する関数
         function startNewChat() {
             currentSessionId = Date.now().toString();
             allSessions[currentSessionId] = { title: "新しい会話", messages: [], timestamp: Date.now() };
-            chatBox.innerHTML = '<div style="text-align:center; color:#ccc; margin-top:50px;">🍯 何かお話ししてだみつ！絵も描けるよ！</div>';
+            chatBox.innerHTML = '<div style="text-align:center; color:#ccc; margin-top:50px;">🍯 お話しするか、「猫の絵を描いて」と頼んでみてね！</div>';
             renderHistoryList();
+            // スマホならサイドバーを閉じる
+            if(window.innerWidth <= 600) document.getElementById('sidebar').classList.remove('open');
         }
 
+        // 画面とデータにメッセージを追加する共通関数
         function processUserMessage(text) {
+            if (!allSessions[currentSessionId]) {
+                startNewChat();
+            }
+            // 最初のメッセージならタイトルを設定
             if (allSessions[currentSessionId].messages.length === 0) {
                 allSessions[currentSessionId].title = text.substring(0, 15);
                 chatBox.innerHTML = ''; 
+                renderHistoryList();
             }
             appendMessage('user', text);
             allSessions[currentSessionId].messages.push({ role: "user", content: text });
             saveToLocalStorage();
             userInput.value = '';
-            renderHistoryList();
         }
 
+        // メッセージ送信関数
         async function sendMessage() {
             const text = userInput.value.trim();
             if (!text) return;
+
             processUserMessage(text);
 
             const loadingId = 'L' + Date.now();
-            appendMessage('assistant', '<span id="'+loading
+            appendMessage('assistant', '<span id="'+loadingId+'">🍯 考え中だみつ...</span>');
+            
+            try {
+                // Groq API (/api/chat) を呼び出す
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        messages: allSessions[currentSessionId].messages, 
+                        systemPrompt: document.getElementById('system-prompt').value 
+                    })
+                });
+                const data = await response.json();
+                const reply = data.reply || "エラーだみつ";
+                
+                // ロード中の表示を消して、AIの返答に書き換え（Markdown画像変換込み）
+                const loadingEl = document.getElementById(loadingId);
+                if (loadingEl) {
+                    loadingEl.parentElement.innerHTML = formatContent(reply);
+                }
+                
+                allSessions[currentSessionId].messages.push({ role: "assistant", content: reply });
+                saveToLocalStorage();
+
+            } catch (e) {
+                const loadingEl = document.getElementById(loadingId);
+                if (loadingEl) loadingEl.innerText = "通信エラーだみつ...";
+                console.error(e);
+            }
+        }
+
+        // コンテンツの整形（Markdown画像記法をimgタグに変換）
+        function formatContent(content) {
+            if (!content) return "";
+            // ![image](url) を <img src="url"> に変換
+            let formatted = content.replace(/!\[image\]\((.*?)\)/g, '<img src="$1" alt="Generated Image">');
+            // 改行を <br> に変換
+            formatted = formatted.replace(/\n/g, '<br>');
+            return formatted;
+        }
+
+        // 画面にメッセージを追加
+        function appendMessage(role, content) {
+            const div = document.createElement('div');
+            div.className = `message ${role === 'user' ? 'user-msg' : 'ai-msg'}`;
+            const name = role === 'user' ? 'あなた' : 'HoneyAI';
+            div.innerHTML = `<span class="sender-name">${name}</span><div class="bubble">${formatContent(content)}</div>`;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function saveToLocalStorage() { 
+            localStorage.setItem('honeyai_sessions', JSON.stringify(allSessions)); 
+        }
+
+        function renderHistoryList() {
+            const list = document.getElementById('history-list'); 
+            if(!list) return;
+            list.innerHTML = '';
+            Object.keys(allSessions).sort((a,b) => allSessions[b].timestamp - allSessions[a].timestamp).forEach(id => {
+                const item = document.createElement('div');
+                item.className = `history-item ${id === currentSessionId ? 'active' : ''}`;
+                item.onclick = () => loadSession(id);
+                item.innerHTML = `💬 ${allSessions[id].title} <button class="delete-btn" onclick="deleteSession(event, '${id}')">×</button>`;
+                list.appendChild(item);
+            });
+        }
+
+        function loadSession(id) {
+            currentSessionId = id; chatBox.innerHTML = '';
+            allSessions[id].messages.forEach(m => appendMessage(m.role, m.content));
+            renderHistoryList();
+            if(window.innerWidth <= 600) document.getElementById('sidebar').classList.remove('open');
+        }
+
+        function deleteSession(e, id) {
+            e.stopPropagation(); if(!confirm("消す？")) return;
+            delete allSessions[id]; saveToLocalStorage();
+            if(id === currentSessionId) startNewChat(); else renderHistoryList();
+        }
+
+        function toggleSettings() { 
+            const p = document.getElementById('settings-panel');
+            p.style.display = p.style.display === 'block' ? 'none' : 'block';
+        }
+    </script>
+</body>
+</html>

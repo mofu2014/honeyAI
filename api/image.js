@@ -1,42 +1,59 @@
-// api/chat.js
-const Groq = require('groq-sdk');
-
+// api/image.js
 module.exports = async function handler(req, res) {
-    // APIキーの確認
-    if (!process.env.GROQ_API_KEY) {
-        return res.status(500).json({ error: "Server Error: GROQ_API_KEY is missing." });
-    }
-
-    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
+    const { prompt } = req.body;
+    const apiKey = process.env.HF_API_KEY;
+
+    if (!apiKey) {
+        console.error("HF_API_KEY missing");
+        return res.status(500).json({ error: 'APIキー設定エラー: HF_API_KEYがありません' });
+    }
+
+    // 無料枠で最も動きやすい軽量モデルを使用
+    const model = "runwayml/stable-diffusion-v1-5";
+
     try {
-        const { messages, systemPrompt } = req.body;
+        console.log(`Generating image for: ${prompt}`);
 
-        // システム設定と会話履歴を結合
-        const conversation = [
-            { 
-                role: "system", 
-                content: systemPrompt || "あなたは親切なAIです。" 
-            },
-            ...(messages || [])
-        ];
+        const response = await fetch(
+            `https://api-inference.huggingface.co/models/${model}`,
+            {
+                headers: {
+                    Authorization: `Bearer ${apiKey}`,
+                    "Content-Type": "application/json",
+                    "x-wait-for-model": "true" // モデル起動待ち
+                },
+                method: "POST",
+                body: JSON.stringify({ inputs: prompt }),
+            }
+        );
 
-        const completion = await groq.chat.completions.create({
-            messages: conversation,
-            model: "llama-3.3-70b-versatile",
-            temperature: 0.7,
-            max_tokens: 1024,
-        });
+        // エラーハンドリング
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error("HF API Error:", errorText);
+            
+            // よくあるエラーを親切に返す
+            if (response.status === 503 || errorText.includes("loading")) {
+                return res.status(503).json({ error: "モデル起動中です。もう一度ボタンを押してください！" });
+            }
+            if (response.status === 410) {
+                return res.status(410).json({ error: "このモデルは現在利用できません(410)。HuggingFace側の制限です。" });
+            }
+            return res.status(response.status).json({ error: `画像生成失敗: ${errorText}` });
+        }
 
-        const reply = completion.choices[0]?.message?.content || "(返答なし)";
-        return res.status(200).json({ reply });
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const base64Image = `data:image/jpeg;base64,${buffer.toString('base64')}`;
+
+        return res.status(200).json({ image: base64Image });
 
     } catch (error) {
-        console.error('Groq Error:', error);
+        console.error("Server Error:", error);
         return res.status(500).json({ error: error.message });
     }
 };

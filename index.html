@@ -138,14 +138,20 @@ async function generateImage() {
     body: JSON.stringify({ prompt: input })
   });
 
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
+  const text = await res.text();
 
-  const chat = document.getElementById("chat");
-  const img = document.createElement("img");
-  img.src = url;
-  chat.appendChild(img);
-  chat.scrollTop = chat.scrollHeight;
+  try {
+    const data = JSON.parse(text);
+    addMessage("画像エラー:\n" + text, "ai");
+  } catch {
+    const blob = new Blob([text]);
+    const url = URL.createObjectURL(blob);
+
+    const chat = document.getElementById("chat");
+    const img = document.createElement("img");
+    img.src = url;
+    chat.appendChild(img);
+  }
 }
 </script>
 

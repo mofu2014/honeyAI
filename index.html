@@ -1,342 +1,207 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HoneyAI</title>
 
 <style>
-
-/* ===============================
-   テーマ変数
-=================================*/
-
 :root{
-  --bg:#ffffff;
-  --panel:#f2f2f2;
-  --text:#111111;
-  --accent:#ff4da6;
+  --honey-main:#f4b400;
+  --honey-light:#ffd54f;
+  --honey-dark:#c88719;
+  --bg-light:#fff8e1;
+  --bg-dark:#1c1a16;
+  --text-light:#2b2b2b;
+  --text-dark:#f5f5f5;
 }
 
+/* テーマ */
+body.light{
+  background:var(--bg-light);
+  color:var(--text-light);
+}
 body.dark{
-  --bg:#0f0f18;
-  --panel:#1a1a24;
-  --text:#eeeeee;
-  --accent:#ff4da6;
+  background:var(--bg-dark);
+  color:var(--text-dark);
 }
-
 body{
-  background:var(--bg);
-  color:var(--text);
-  font-family:-apple-system,BlinkMacSystemFont,sans-serif;
   margin:0;
-  padding:30px;
+  font-family:"Segoe UI",sans-serif;
   transition:0.3s;
+  overflow:hidden;
 }
 
-h1{
-  font-weight:600;
-  margin-bottom:20px;
+/* 六角形背景 */
+body::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  background-image:
+  radial-gradient(circle at 25px 25px, rgba(0,0,0,0.04) 2px, transparent 2px);
+  background-size:50px 50px;
+  opacity:0.3;
+  pointer-events:none;
 }
 
-.section{
-  margin-bottom:30px;
-  padding:20px;
-  background:var(--panel);
-  border-radius:12px;
-}
-
-input,select{
-  padding:10px;
-  border-radius:8px;
-  border:1px solid #ccc;
-  width:250px;
-  background:transparent;
-  color:var(--text);
-}
-
-button{
-  padding:10px 16px;
-  border-radius:8px;
-  border:none;
-  background:var(--accent);
-  color:white;
-  cursor:pointer;
-}
-
-button:hover{
-  opacity:0.85;
-}
-
-#chatBox{
-  height:300px;
-  overflow-y:auto;
+/* ヘッダー */
+header{
   padding:15px;
-  background:var(--panel);
-  border-radius:12px;
-  margin-bottom:10px;
+  text-align:center;
+  font-size:22px;
+  font-weight:600;
+  background:linear-gradient(135deg,var(--honey-light),var(--honey-main));
+  box-shadow:0 4px 12px rgba(0,0,0,0.08);
 }
 
-.message{
-  margin-bottom:12px;
+/* コントロール */
+.controls{
+  display:flex;
+  gap:10px;
   padding:10px;
-  border-radius:8px;
+  justify-content:center;
+  flex-wrap:wrap;
+}
+select{
+  padding:8px 14px;
+  border-radius:20px;
+  border:none;
+  background:var(--honey-light);
+  font-size:14px;
 }
 
+/* チャットエリア */
+.chat{
+  height:65vh;
+  overflow-y:auto;
+  padding:20px;
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+
+/* バブル */
+.message{
+  max-width:70%;
+  padding:12px 18px;
+  border-radius:24px;
+  position:relative;
+  animation:fadeIn 0.3s ease;
+}
 .user{
-  background:rgba(0,0,0,0.05);
+  align-self:flex-end;
+  background:#e0e0e0;
 }
-
 .ai{
-  background:rgba(255,77,166,0.1);
+  align-self:flex-start;
+  background:linear-gradient(135deg,var(--honey-light),var(--honey-main));
 }
 
-img{
-  max-width:350px;
-  margin-top:15px;
-  border-radius:12px;
+/* 入力欄 */
+.input-area{
+  display:flex;
+  padding:15px;
+  gap:10px;
+}
+input{
+  flex:1;
+  padding:12px;
+  border-radius:20px;
+  border:1px solid #ccc;
+  font-size:15px;
+}
+button{
+  padding:12px 18px;
+  border:none;
+  border-radius:20px;
+  background:var(--honey-main);
+  cursor:pointer;
+  transition:0.2s;
+}
+button:hover{
+  background:var(--honey-dark);
+  transform:translateY(-2px);
 }
 
-.theme-select{
-  margin-left:10px;
+/* アニメ */
+@keyframes fadeIn{
+  from{opacity:0;transform:translateY(5px);}
+  to{opacity:1;transform:translateY(0);}
 }
-
 </style>
 </head>
-<body>
+<body class="light">
 
-<h1>HoneyAI</h1>
+<header>HoneyAI</header>
 
-<div class="section">
-  <label>性格設定:</label><br>
-  <input id="personalityInput" placeholder="例: 冷静で論理的、少し皮肉屋">
-  <button onclick="initCharacter()">保存</button>
-</div>
+<div class="controls">
+  <select id="personality">
+    <option value="敬語">敬語</option>
+    <option value="なれなれしい">なれなれしい</option>
+    <option value="敬語×なれなれしい">敬語×なれなれしい</option>
+  </select>
 
-<div class="section">
-  <label>テーマ:</label>
-  <select id="themeSelect" class="theme-select" onchange="changeTheme()">
-    <option value="system">System</option>
-    <option value="light">Light</option>
-    <option value="dark">Black</option>
+  <select id="theme">
+    <option value="light">ライト</option>
+    <option value="dark">ブラック</option>
+    <option value="system">システム</option>
   </select>
 </div>
 
-<div class="section">
-  <h2>画像生成</h2>
-  <input id="imagePrompt" placeholder="画像プロンプト">
-  <button onclick="generateImage()">生成</button>
-  <br>
-  <img id="output">
-</div>
+<div class="chat" id="chat"></div>
 
-<div class="section">
-  <h2>会話</h2>
-  <div id="chatBox"></div>
-  <input id="chatInput" placeholder="話しかける">
-  <button onclick="talk()">送信</button>
+<div class="input-area">
+  <input type="text" id="input" placeholder="メッセージを入力...">
+  <button onclick="sendMessage()">送信</button>
 </div>
 
 <script>
+const chat = document.getElementById("chat");
+const input = document.getElementById("input");
+const themeSelect = document.getElementById("theme");
 
-let character = null;
-
-/* ===============================
-   テーマ管理
-=================================*/
-
-function changeTheme(){
-  const value =
-    document.getElementById("themeSelect").value;
-
-  localStorage.setItem("honey_theme",value);
-
-  if(value==="dark"){
-    document.body.classList.add("dark");
-  }else if(value==="light"){
-    document.body.classList.remove("dark");
+/* テーマ切替 */
+themeSelect.addEventListener("change",()=>{
+  const value = themeSelect.value;
+  if(value==="system"){
+    const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    document.body.className = dark ? "dark" : "light";
   }else{
-    // system
-    const prefersDark =
-      window.matchMedia("(prefers-color-scheme: dark)").matches;
-
-    if(prefersDark){
-      document.body.classList.add("dark");
-    }else{
-      document.body.classList.remove("dark");
-    }
+    document.body.className = value;
   }
+});
+
+/* メッセージ追加 */
+function addMessage(text,type){
+  const div=document.createElement("div");
+  div.className="message "+type;
+  div.textContent=text;
+  chat.appendChild(div);
+  chat.scrollTop=chat.scrollHeight;
 }
 
-function loadTheme(){
-  const saved =
-    localStorage.getItem("honey_theme") || "system";
+/* 送信 */
+async function sendMessage(){
+  const text=input.value.trim();
+  if(!text) return;
 
-  document.getElementById("themeSelect").value = saved;
-  changeTheme();
-}
+  addMessage(text,"user");
+  input.value="";
 
-loadTheme();
+  const personality=document.getElementById("personality").value;
 
-/* ===============================
-   キャラ管理
-=================================*/
-
-function initCharacter(){
-
-  const personality =
-    document.getElementById("personalityInput").value;
-
-  if(!personality){
-    alert("性格を入力してください");
-    return;
-  }
-
-  character = {
-    personality: personality,
-    hiddenPersonality: "優しい",
-    memory: []
-  };
-
-  localStorage.setItem(
-    "honey_character",
-    JSON.stringify(character)
-  );
-}
-
-function loadCharacter(){
-  const saved =
-    localStorage.getItem("honey_character");
-
-  if(saved){
-    character = JSON.parse(saved);
-    document.getElementById("personalityInput").value =
-      character.personality;
-  }
-}
-
-loadCharacter();
-
-/* ===============================
-   画像生成
-=================================*/
-
-async function generateImage(){
-
-  const prompt =
-    document.getElementById("imagePrompt").value;
-
-  const response = await fetch("/api/image",{
+  const res=await fetch("/api/chat",{
     method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body:JSON.stringify({ prompt })
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      message:text,
+      personality:personality
+    })
   });
 
-  if(!response.ok){
-    alert("画像生成エラー");
-    return;
-  }
-
-  const blob = await response.blob();
-  document.getElementById("output").src =
-    URL.createObjectURL(blob);
+  const data=await res.json();
+  addMessage(data.reply,"ai");
 }
-
-/* ===============================
-   会話
-=================================*/
-
-async function talk(){
-
-  if(!character){
-    alert("性格を設定してください");
-    return;
-  }
-
-  const input =
-    document.getElementById("chatInput").value;
-
-  appendMessage(input,"user");
-
-  character.memory.push({
-    role:"user",
-    content:input
-  });
-
-  const history =
-    character.memory
-      .map(m=>`${m.role}:${m.content}`)
-      .join("\n");
-   
-const systemPrompt = `
-あなたはHoneyAIです。
-
-【最優先ルール】
-隠し性格「優しい」は常に適用されます。
-ユーザーを責める・攻撃する・不快にさせる発言は禁止。
-
-【表の性格】
-${character.personality}
-・この性格の話し方で話す
-・ただし上記の優しさルールを破らない
-
-表の性格があいまいな場合：
-・敬語
-・落ち着いた口調
-・丁寧で優しい対応
-【話し方制限】
-・語尾を過度に伸ばさない（〜〜〜は禁止）
-・テンションを上げすぎない
-・自然な会話トーンを維持する
-・一文は長くしすぎない
-
-
-会話履歴:
-${history}
-
-HoneyAIとして自然で一貫した人格を維持してください。
-`;
-
-
-
-  const response = await fetch("/api/chat",{
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body:JSON.stringify({ prompt: systemPrompt })
-  });
-
-  const data = await response.json();
-
-  const reply =
-    data.reply || "...";
-
-  appendMessage(reply,"ai");
-
-  character.memory.push({
-    role:"ai",
-    content:reply
-  });
-
-  localStorage.setItem(
-    "honey_character",
-    JSON.stringify(character)
-  );
-
-  document.getElementById("chatInput").value="";
-}
-
-function appendMessage(text,type){
-
-  const box =
-    document.getElementById("chatBox");
-
-  const div = document.createElement("div");
-  div.classList.add("message",type);
-  div.textContent = text;
-
-  box.appendChild(div);
-  box.scrollTop = box.scrollHeight;
-}
-
 </script>
 
 </body>

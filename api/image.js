@@ -13,7 +13,7 @@ module.exports = async function handler(req, res) {
         return res.status(500).json({ error: 'APIキーが見つかりません。コード内の変数名とVercelの環境変数名(HF_API_KEY)が一致しているか確認してください。' });
     }
 
-    const model = "runwayml/stable-diffusion-v1-5";
+const model = "CompVis/stable-diffusion-v1-4";
 
     try {
         console.log(`Generating image for: ${prompt}`);

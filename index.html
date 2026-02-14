@@ -6,91 +6,65 @@
     <title>HoneyAI 🍯</title>
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --honey-dark: #8B4513; --honey-gold: #FFC107; --honey-light: #FFF8E1;
-            --honey-accent: #FF9800; --sidebar-bg: #FDF5E6;
-        }
+        :root { --honey-dark: #8B4513; --honey-gold: #FFC107; --honey-light: #FFF8E1; --honey-accent: #FF9800; --sidebar-bg: #FDF5E6; }
         body { font-family: 'M PLUS Rounded 1c', sans-serif; background: var(--honey-light); margin: 0; display: flex; height: 100vh; color: var(--honey-dark); overflow: hidden; }
-        
-        /* サイドバー */
         .sidebar { width: 260px; background: var(--sidebar-bg); border-right: 2px solid #FFE082; display: flex; flex-direction: column; padding: 15px; flex-shrink: 0; transition: 0.3s; }
-        .new-chat-btn { background: var(--honey-gold); border: none; padding: 12px; border-radius: 20px; font-weight: bold; cursor: pointer; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: 0.2s; }
-        .new-chat-btn:hover { background: var(--honey-accent); color: white; }
+        .new-chat-btn { background: var(--honey-gold); border: none; padding: 12px; border-radius: 20px; font-weight: bold; cursor: pointer; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .history-list { flex-grow: 1; overflow-y: auto; }
         .history-item { padding: 12px; margin-bottom: 8px; border-radius: 12px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.85rem; position: relative; background: rgba(255,255,255,0.5); }
         .history-item.active { background: #FFE082; font-weight: bold; border: 1px solid var(--honey-gold); }
         .delete-btn { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #888; cursor: pointer; display: none; font-size: 1.2rem; }
         .history-item:hover .delete-btn { display: block; }
-
-        /* メイン */
         .main-content { flex-grow: 1; display: flex; flex-direction: column; background: white; width: 100%; }
         header { padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; color: var(--honey-accent); font-weight: bold; }
         #chat-box { flex-grow: 1; padding: 20px; overflow-y: auto; background-image: radial-gradient(#FFF8E1 20%, transparent 20%); background-size: 20px 20px; }
-        
-        /* メッセージ */
         .message { margin-bottom: 20px; display: flex; flex-direction: column; }
-        .bubble { max-width: 80%; padding: 12px 16px; border-radius: 18px; line-height: 1.6; font-size: 0.95rem; word-wrap: break-word; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .bubble { max-width: 80%; padding: 12px 16px; border-radius: 18px; line-height: 1.6; font-size: 0.95rem; word-wrap: break-word; }
         .user-msg { align-items: flex-end; }
         .user-msg .bubble { background: var(--honey-accent); color: white; border-bottom-right-radius: 4px; }
         .ai-msg { align-items: flex-start; }
         .ai-msg .bubble { background: var(--honey-light); border: 1px solid #FFE082; border-bottom-left-radius: 4px; }
-        
-        /* 思考プロセスのデザイン */
         details { font-size: 0.8rem; color: #795548; background: #fffde7; border-radius: 12px; padding: 10px; margin-bottom: 10px; border: 1px dashed var(--honey-gold); }
         summary { cursor: pointer; color: var(--honey-accent); font-weight: bold; outline: none; list-style: none; }
-        summary::-webkit-details-marker { display: none; }
         summary::before { content: "🐝 "; }
-
-        /* 入力エリア */
-        .input-area { padding: 15px; border-top: 1px solid #eee; display: flex; gap: 10px; background: white; }
-        #user-input { flex-grow: 1; padding: 12px 20px; border: 2px solid #ddd; border-radius: 25px; outline: none; font-size: 1rem; transition: 0.3s; }
-        #user-input:focus { border-color: var(--honey-gold); }
-        .send-btn { background: var(--honey-gold); border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; color: white; font-size: 1.2rem; transition: 0.2s; }
-        .send-btn:hover { background: var(--honey-accent); transform: scale(1.1); }
-
-        /* 設定パネル */
+        .input-area { padding: 15px; border-top: 1px solid #eee; display: flex; gap: 10px; }
+        #user-input { flex-grow: 1; padding: 12px 20px; border: 2px solid #ddd; border-radius: 25px; outline: none; font-size: 1rem; }
+        .send-btn { background: var(--honey-gold); border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; color: white; font-size: 1.2rem; }
         #settings-panel { display: none; position: absolute; top: 60px; right: 20px; background: white; border: 3px solid var(--honey-gold); padding: 20px; border-radius: 15px; z-index: 100; width: 300px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
         .setting-item { margin-bottom: 15px; }
-        .setting-item label { font-size: 0.8rem; font-weight: bold; display: block; margin-bottom: 5px; color: var(--honey-dark); }
-        select, textarea { width: 100%; padding: 10px; border-radius: 10px; border: 2px solid #eee; font-family: inherit; font-size: 0.85rem; outline: none; box-sizing: border-box; }
-        select:focus, textarea:focus { border-color: var(--honey-gold); }
-
+        .setting-item label { font-size: 0.8rem; font-weight: bold; display: block; margin-bottom: 5px; }
+        select, textarea { width: 100%; padding: 10px; border-radius: 10px; border: 2px solid #eee; font-family: inherit; font-size: 0.85rem; box-sizing: border-box; }
         @media (max-width: 600px) { .sidebar { position: absolute; height: 100%; z-index: 1000; transform: translateX(-100%); } .sidebar.open { transform: translateX(0); } }
     </style>
 </head>
 <body>
-
     <aside class="sidebar" id="sidebar">
         <button class="new-chat-btn" onclick="startNewChat()">+ 新しいチャット</button>
         <div class="history-list" id="history-list"></div>
     </aside>
-
     <main class="main-content">
         <header>
             <span onclick="document.getElementById('sidebar').classList.toggle('open')" style="cursor:pointer;">☰ 🍯 HoneyAI</span>
             <button onclick="toggleSettings()" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">⚙️</button>
         </header>
-
         <div id="settings-panel">
             <div class="setting-item">
-                <label>🧠 思考モードを選択だみつ</label>
+                <label>🧠 思考モード</label>
                 <select id="model-id">
-                    <option value="llama-3.1-8b-instant">⚡ 高速 (爆速で答えるみつ！)</option>
-                    <option value="llama-3.3-70b-versatile" selected>🐝 通常 (テキパキ答えるみつ)</option>
-                    <option value="deepseek-r1-distill-llama-70b">💎 じっくり (時間はかかるけど賢いみつ)</option>
+                    <option value="llama-3.1-8b-instant">⚡ 高速 (爆速)</option>
+                    <option value="llama-3.3-70b-versatile" selected>🐝 通常 (安定)</option>
+                    <option value="deepseek-r1-distill-llama-70b">💎 じっくり (超賢い)</option>
                 </select>
             </div>
             <div class="setting-item">
-                <label>HoneyAIの性格設定</label>
-                <textarea id="system-prompt" rows="5">あなたはハチミツの妖精HoneyAIです。語尾は「〜だみつ」。甘く優しいハチミツのような言葉で、相手を癒してだみつ！</textarea>
+                <label>性格設定</label>
+                <textarea id="system-prompt" rows="5">あなたはハチミツの妖精HoneyAIです。語尾は「〜だみつ」。</textarea>
             </div>
-            <button onclick="toggleSettings()" style="width:100%; background:var(--honey-gold); border:none; padding:12px; border-radius:12px; cursor:pointer; font-weight:bold; color:var(--honey-dark);">設定を閉じる</button>
+            <button onclick="toggleSettings()" style="width:100%; background:var(--honey-gold); border:none; padding:12px; border-radius:12px; cursor:pointer; font-weight:bold;">設定を閉じる</button>
         </div>
-
         <div id="chat-box"></div>
-
         <div class="input-area">
-            <input type="text" id="user-input" placeholder="メッセージを入力だみつ..." onkeypress="if(event.key === 'Enter') sendMessage()">
+            <input type="text" id="user-input" placeholder="メッセージを入力..." onkeypress="if(event.key === 'Enter') sendMessage()">
             <button class="send-btn" onclick="sendMessage()">➤</button>
         </div>
     </main>
@@ -121,13 +95,14 @@
 
             appendMessage('user', text);
             allSessions[currentSessionId].messages.push({ role: "user", content: text });
-            saveToLocalStorage();
             userInput.value = '';
-            renderHistoryList();
 
-            const loadingId = 'L' + Date.now();
-            appendMessage('assistant', '<span id="'+loadingId+'">🍯 蜜を練りながら考えてるみつ...</span>');
-            
+            // AIのバブルを先に作成
+            const bubbleId = 'B' + Date.now();
+            appendMessage('assistant', '<span id="'+bubbleId+'">...</span>');
+            const bubble = document.getElementById(bubbleId);
+            let fullReply = "";
+
             try {
                 const response = await fetch('/api/chat', {
                     method: 'POST',
@@ -138,41 +113,47 @@
                         modelId: document.getElementById('model-id').value
                     })
                 });
-                const data = await response.json();
-                const reply = data.reply || "ごめんみつ、エラーだみつ";
-                
-                const container = document.getElementById(loadingId).parentElement;
-                container.innerHTML = formatContent(reply);
-                
-                allSessions[currentSessionId].messages.push({ role: "assistant", content: reply });
+
+                if (!response.ok) throw new Error('Network error');
+
+                // ストリームを読み取るだみつ！
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    fullReply += decoder.decode(value);
+                    // 届いた分だけリアルタイムに表示を更新
+                    bubble.parentElement.innerHTML = formatContent(fullReply);
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                }
+
+                allSessions[currentSessionId].messages.push({ role: "assistant", content: fullReply });
                 saveToLocalStorage();
+                renderHistoryList();
             } catch (e) {
-                document.getElementById(loadingId).innerText = "通信エラーだみつ...蜜が詰まったかも";
+                bubble.innerText = "エラーだみつ...蜜が詰まったかも";
             }
         }
 
         function formatContent(content) {
             if (!content) return "";
-            // <think>タグがあれば折り畳み表示
-            let formatted = content.replace(/<think>([\s\S]*?)<\/think>/g, (match, thought) => {
-                return `<details>
-                            <summary>HoneyAIが一生懸命考えた過程だみつ</summary>
-                            <div style="margin-top: 8px; font-style: italic; color: #8D6E63; border-top: 1px solid #eee; padding-top: 8px;">${thought.trim().replace(/\n/g, '<br>')}</div>
-                        </details>`;
-            });
-            return formatted.replace(/\n/g, '<br>');
+            return content.replace(/<think>([\s\S]*?)<\/think>/g, (match, thought) => {
+                return `<details open><summary>思考中だみつ...</summary><div style="font-style:italic;color:#8D6E63;padding:8px;">${thought.trim().replace(/\n/g, '<br>')}</div></details>`;
+            }).replace(/\n/g, '<br>');
         }
 
         function appendMessage(role, content) {
             const div = document.createElement('div');
             div.className = `message ${role === 'user' ? 'user-msg' : 'ai-msg'}`;
-            div.innerHTML = `<span style="font-size:0.75rem; color:#bbb; margin-bottom:4px; padding: 0 10px;">${role==='user'?'あなた':'HoneyAI'}</span><div class="bubble">${formatContent(content)}</div>`;
+            div.innerHTML = `<span style="font-size:0.7rem;color:#bbb;">${role==='user'?'あなた':'HoneyAI'}</span><div class="bubble">${formatContent(content)}</div>`;
             chatBox.appendChild(div);
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
         function saveToLocalStorage() { localStorage.setItem('honeyai_sessions', JSON.stringify(allSessions)); }
-
         function renderHistoryList() {
             const list = document.getElementById('history-list'); list.innerHTML = '';
             Object.keys(allSessions).sort((a,b) => allSessions[b].timestamp - allSessions[a].timestamp).forEach(id => {
@@ -183,20 +164,16 @@
                 list.appendChild(item);
             });
         }
-
         function loadSession(id) {
             currentSessionId = id; chatBox.innerHTML = '';
             allSessions[id].messages.forEach(m => appendMessage(m.role, m.content));
             renderHistoryList();
-            if(window.innerWidth <= 600) document.getElementById('sidebar').classList.remove('open');
         }
-
         function deleteSession(e, id) {
-            e.stopPropagation(); if(!confirm("この会話を消してもいいみつ？")) return;
+            e.stopPropagation(); if(!confirm("消す？")) return;
             delete allSessions[id]; saveToLocalStorage();
             if(id === currentSessionId) startNewChat(); else renderHistoryList();
         }
-
         function toggleSettings() { 
             const p = document.getElementById('settings-panel');
             p.style.display = p.style.display === 'block' ? 'none' : 'block';

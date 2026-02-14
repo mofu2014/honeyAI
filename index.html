@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HoneyAI Pro 🍯</title>
+    <title>HoneyAI</title>
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
     <!-- 外部ライブラリ -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -195,7 +195,7 @@
         function startNewChat() {
             currentSessionId = Date.now().toString();
             allSessions[currentSessionId] = { title: "新しいプロジェクト", messages: [], timestamp: Date.now() };
-            chatBox.innerHTML = '<div style="text-align:center; color:#ccc; margin-top:50px;">🍯 新しいプロジェクトだみつ！<br>設定で文字数をたっぷり増やせるよ！</div>';
+            chatBox.innerHTML = '<div style="text-align:center; color:#ccc; margin-top:50px;">新しいプロジェクトです！！<br>設定で文字数をたっぷり増やせるよ！</div>';
             renderHistoryList();
             if(window.innerWidth <= 600) document.getElementById('sidebar').classList.remove('open');
         }
@@ -258,7 +258,7 @@
             }
 
             const bubbleId = 'B' + Date.now();
-            appendMessage('assistant', '<span id="'+bubbleId+'">🍯 ...</span>');
+            appendMessage('assistant', '<span id="'+bubbleId+'"> ...</span>');
             const bubbleContainer = document.getElementById(bubbleId).parentElement;
             let fullReply = "";
 
@@ -364,7 +364,7 @@
             appSettings.userProfession = document.getElementById('user-profession').value;
             
             localStorage.setItem('honeyai_settings', JSON.stringify(appSettings));
-            alert('設定を保存したみつ！');
+            alert('設定を保存しました');
             toggleSettings();
         }
 

@@ -140,24 +140,25 @@ IMAGE_GEN: english_prompt_here
             }
         }
 
-        function formatContent(content) {
+function formatContent(content) {
             if (!content) return "";
             
             // "IMAGE_GEN: プロンプト" を検知
             let formatted = content.replace(/IMAGE_GEN:\s*(.+)/g, (match, prompt) => {
-                // 1. ゴミ掃除: 「だみつ」や記号、日本語を消す
-                // 英語とカンマ、数字だけ残すフィルター
+                // 1. ゴミ掃除: 英語・数字・カンマ・スペース以外を徹底排除
                 let cleanPrompt = prompt.replace(/[^a-zA-Z0-9,\s]/g, '').trim();
 
-                // もし空っぽになっちゃったら、デフォルトの猫にする (Error 1033回避)
                 if (!cleanPrompt || cleanPrompt.length < 3) {
-                    cleanPrompt = "cute cat"; 
+                    cleanPrompt = "honey bear in forest"; 
                 }
                 
                 // 2. URL作成
+                // サブドメインを image. から pollinations.ai/p/ に変更（こちらの方が安定します）
                 const safePrompt = encodeURIComponent(cleanPrompt);
-                const seed = Math.floor(Math.random() * 100000);
-                const url = `https://image.pollinations.ai/prompt/${safePrompt}?width=1024&height=1024&nologo=true&seed=${seed}&model=flux`;
+                const seed = Math.floor(Math.random() * 1000000);
+                
+                // モデル指定(flux)を外すと、より繋がりやすい標準モデルになります
+                const url = `https://pollinations.ai/p/${safePrompt}?width=1024&height=1024&seed=${seed}`;
                 
                 return `描けたよ！🍯<br><img src="${url}" alt="Generating Image..." onload="this.style.background='transparent'">`;
             });

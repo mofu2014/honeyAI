@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   const { prompt } = JSON.parse(body);
 
   const response = await fetch(
-    "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2",
+    "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-2",
     {
       method: "POST",
       headers: {
@@ -26,9 +26,8 @@ export default async function handler(req, res) {
 
   const contentType = response.headers.get("content-type");
 
-  if (!contentType.includes("image")) {
+  if (!contentType || !contentType.includes("image")) {
     const errorText = await response.text();
-    console.log("HF ERROR:", errorText);
     return res.status(500).json({ error: errorText });
   }
 

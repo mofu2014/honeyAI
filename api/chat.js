@@ -11,23 +11,19 @@ module.exports = async function handler(req, res) {
     }
 
     try {
-        const { messages, systemPrompt } = req.body;
-
-        const conversation = [
-            { 
-                role: "system", 
-                content: systemPrompt 
-            },
-            ...messages
-        ];
+        const { messages, systemPrompt, modelId } = req.body;
 
         const completion = await groq.chat.completions.create({
-            messages: conversation,
-            model: "llama-3.3-70b-versatile",
-            temperature: 0.7,
+            messages: [
+                { role: "system", content: systemPrompt },
+                ...messages
+            ],
+            // フロントエンドから届いたモデルIDを使用
+            model: modelId || "llama-3.3-70b-versatile",
+            temperature: 0.6,
         });
 
-        const reply = completion.choices[0]?.message?.content || "返答がないみつ...";
+        const reply = completion.choices[0]?.message?.content || "";
         return res.status(200).json({ reply });
 
     } catch (error) {

@@ -229,25 +229,29 @@
                 appendMessage('assistant', '通信エラーだみつ...');
             }
         }
-
-        // --- 画像生成 (サーバーを経由せず、直接ブラウザで生成) ---
-        // ★ここが修正ポイント：サーバーレス関数を使いません★
-        function generateImageDirect() {
+function generateImageDirect() {
             const text = userInput.value.trim();
             if (!text) { alert("何を描くか入力してね！"); return; }
 
             processUserMessage(text + " (🎨画像生成)");
 
-            // PollinationsのURLを構築 (Fluxモデル指定)
-            // ランダムシードをつけて毎回違う画像にする
-            const seed = Math.floor(Math.random() * 100000);
+            // シード値を生成
+            const seed = Math.floor(Math.random() * 1000000);
             const promptEncoded = encodeURIComponent(text);
-            const imageUrl = `https://image.pollinations.ai/prompt/${promptEncoded}?width=1024&height=1024&seed=${seed}&nologo=true&model=flux`;
+            
+            // ★URLを一番シンプルな形式に修正しました
+            const imageUrl = `https://pollinations.ai/p/${promptEncoded}?width=1024&height=1024&seed=${seed}&model=flux`;
 
-            // HTMLの<img>タグとして直接表示
+            // 表示するメッセージ
             const imgHtml = `
-                <div>描けたよ！🍯</div>
-                <img src="${imageUrl}" alt="Loading Image..." onload="this.style.background='transparent'">
+                <div style="margin-bottom: 8px;">描けたよ！🍯</div>
+                <div style="position: relative; min-height: 200px; background: #eee; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                    <span style="position: absolute; color: #888;">今ハチミツを塗ってるだみつ...🎨</span>
+                    <img src="${imageUrl}" 
+                         style="width: 100%; border-radius: 10px; position: relative; z-index: 1;" 
+                         onload="this.previousElementSibling.style.display='none';"
+                         onerror="this.parentElement.innerHTML='画像が読み込めなかったみつ...もう一度試してね。';">
+                </div>
             `;
             
             appendMessage('assistant', imgHtml);

@@ -5,19 +5,18 @@ module.exports = async function handler(req, res) {
     }
 
     const { prompt } = req.body;
-
-    // ここを修正！画像で見せてくれた「HF_API_KEY」を読み込むようにしました
+    
+    // APIキーの確認
     const apiKey = process.env.HF_API_KEY;
-
     if (!apiKey) {
-        return res.status(500).json({ error: 'APIキーが見つかりません。コード内の変数名とVercelの環境変数名(HF_API_KEY)が一致しているか確認してください。' });
+        return res.status(500).json({ error: 'サーバー設定エラー: HF_API_KEYが見つかりません' });
     }
 
-// api/image.js の中で
-const model = "stabilityai/stable-diffusion-xl-base-1.0";
+    // モデル: 最新の高速モデル FLUX.1-schnell を指定
+    const model = "black-forest-labs/FLUX.1-schnell";
 
     try {
-        console.log(`Generating image for: ${prompt}`);
+        console.log(`[Image Generation] Prompt: ${prompt}, Model: ${model}`);
 
         const response = await fetch(
             `https://api-inference.huggingface.co/models/${model}`,
@@ -25,22 +24,27 @@ const model = "stabilityai/stable-diffusion-xl-base-1.0";
                 headers: {
                     Authorization: `Bearer ${apiKey}`,
                     "Content-Type": "application/json",
+                    "x-wait-for-model": "true" // 重要: モデル起動待ちをする設定
                 },
                 method: "POST",
-                body: JSON.stringify({ inputs: prompt }),
+                body: JSON.stringify({ 
+                    inputs: prompt
+                }),
             }
         );
 
+        // エラーハンドリング
         if (!response.ok) {
             const errorText = await response.text();
-            console.error("Hugging Face API Error:", errorText);
+            console.error("[HF API Error]", response.status, errorText);
             
-            if (errorText.includes("loading")) {
-                return res.status(503).json({ error: 'モデルを起動中だみつ...。20秒くらい待ってからもう一度押してね！' });
-            }
-            throw new Error(`API Error: ${response.status}`);
+            // 410や403などの詳細をフロントエンドに返す
+            return res.status(response.status).json({ 
+                error: `API Error ${response.status}: ${errorText}` 
+            });
         }
 
+        // 成功した場合: 画像データ(blob)を取得してBase64化
         const arrayBuffer = await response.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
         const base64Image = `data:image/jpeg;base64,${buffer.toString('base64')}`;
@@ -48,7 +52,7 @@ const model = "stabilityai/stable-diffusion-xl-base-1.0";
         return res.status(200).json({ image: base64Image });
 
     } catch (error) {
-        console.error("Server Error:", error);
-        return res.status(500).json({ error: `画像生成エラー: ${error.message}` });
+        console.error("[Server Internal Error]", error);
+        return res.status(500).json({ error: error.message });
     }
 };

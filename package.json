@@ -1,6 +1,6 @@
 {
   "name": "honey-ai-ultimate",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "dependencies": {
     "groq-sdk": "^0.3.3"
   }

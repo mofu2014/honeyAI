@@ -235,44 +235,29 @@ function generateImageDirect() {
 
             processUserMessage(text + " (🎨画像生成)");
 
-            // シード値を生成
-            const seed = Math.floor(Math.random() * 1000000);
+            // シード値（毎回違う絵にするため）
+            const seed = Math.floor(Math.random() * 9999999);
             const promptEncoded = encodeURIComponent(text);
             
-            // ★URLを一番シンプルな形式に修正しました
-            const imageUrl = `https://pollinations.ai/p/${promptEncoded}?width=1024&height=1024&seed=${seed}&model=flux`;
+            // ★最も安定している専用の画像取得URLに変更
+            const imageUrl = `https://image.pollinations.ai/prompt/${promptEncoded}?seed=${seed}&width=1024&height=1024&nologo=true`;
 
-            // 表示するメッセージ
+            // メッセージを表示
             const imgHtml = `
-                <div style="margin-bottom: 8px;">描けたよ！🍯</div>
-                <div style="position: relative; min-height: 200px; background: #eee; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                    <span style="position: absolute; color: #888;">今ハチミツを塗ってるだみつ...🎨</span>
+                <div style="margin-bottom: 8px;">ハチミツを塗って描いたよ！🍯</div>
+                <div style="min-height: 200px; background: #fdf5e6; border-radius: 10px; display: flex; align-items: center; justify-content: center; border: 2px dashed var(--honey-gold);">
                     <img src="${imageUrl}" 
-                         style="width: 100%; border-radius: 10px; position: relative; z-index: 1;" 
-                         onload="this.previousElementSibling.style.display='none';"
-                         onerror="this.parentElement.innerHTML='画像が読み込めなかったみつ...もう一度試してね。';">
+                         style="width: 100%; border-radius: 10px; display: block;" 
+                         onload="this.parentElement.style.border='none';"
+                         onerror="this.parentElement.innerHTML='ごめんね、もう一度ボタンを押してみてほしいみつ...';">
                 </div>
             `;
             
             appendMessage('assistant', imgHtml);
             
-            // 履歴に保存
             allSessions[currentSessionId].messages.push({ role: "assistant", content: imgHtml });
             saveToLocalStorage();
         }
-
-        // --- 共通関数 ---
-        function processUserMessage(text) {
-            if (allSessions[currentSessionId].messages.length === 0) {
-                allSessions[currentSessionId].title = text.substring(0, 15) + "...";
-                renderHistoryList();
-            }
-            appendMessage('user', text);
-            allSessions[currentSessionId].messages.push({ role: "user", content: text });
-            saveToLocalStorage();
-            userInput.value = '';
-        }
-
         function appendMessage(role, htmlContent) {
             const div = document.createElement('div');
             div.className = `message ${role === 'user' ? 'user-msg' : 'ai-msg'}`;

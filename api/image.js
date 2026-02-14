@@ -14,7 +14,7 @@ module.exports = async function handler(req, res) {
     }
 
 // api/image.js の中で
-const model = "Sunanda-Das/new-text-to-image-v4.2";
+const model = "SG161222/Realistic_Vision_V5.1_noVAE";
 
     try {
         console.log(`Generating image for: ${prompt}`);

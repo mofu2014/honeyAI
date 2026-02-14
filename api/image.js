@@ -12,8 +12,10 @@ module.exports = async function handler(req, res) {
         return res.status(500).json({ error: 'APIキー設定エラー: HF_API_KEYがありません' });
     }
 
-    // 無料枠で最も動きやすい軽量モデルを使用
-    const model = "runwayml/stable-diffusion-v1-5";
+// 変更前
+//const model = "runwayml/stable-diffusion-v1-5";
+// 変更後（最新の安定モデル）
+const model = "black-forest-labs/FLUX.1-schnell";
 
     try {
         console.log(`Generating image for: ${prompt}`);

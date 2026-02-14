@@ -47,17 +47,16 @@
 
         <div id="settings-panel">
             <label style="font-size:0.8rem; font-weight:bold;">性格・画像生成ルール</label>
-            <textarea id="system-prompt" rows="8" style="width:100%; font-size:0.75rem; margin-top:5px; padding:5px; border:1px solid #ccc; border-radius:5px;">あなたはハチミツの妖精HoneyAIです。語尾は「〜だみつ」。
+            <textarea id="system-prompt" rows="8" style="width:100%; font-size:0.75rem; margin-top:5px; padding:5px; border:1px solid #ccc; border-radius:5px;">あなたはハチミツの妖精HoneyAIです。普段の語尾は「〜だみつ」。
 
-【画像生成のルール】
-ユーザーから「絵を描いて」「画像を作って」等の依頼があった場合、説明は省略し、以下のキーワードのみを出力してください。
+【画像生成の絶対ルール】
+ユーザーから「絵を描いて」等の依頼があった場合、以下のキーワードのみを出力してください。
+この行には絶対に「だみつ」や日本語をつけないでください。英語のみです。
 IMAGE_GEN: 【依頼内容を英語に翻訳した短いプロンプト】
 
 例:
 ユーザー「猫の絵を描いて」
-あなた「IMAGE_GEN: a cute cat, soft lighting, 4k」
-
-それ以外は優しく日本語で話してください。</textarea>
+あなた「IMAGE_GEN: a cute cat, soft lighting, 4k」</textarea>
             <button onclick="toggleSettings()" style="width:100%; margin-top:10px; cursor:pointer;">設定を閉じる</button>
         </div>
 
@@ -123,11 +122,10 @@ IMAGE_GEN: 【依頼内容を英語に翻訳した短いプロンプト】
                 const data = await response.json();
                 const reply = data.reply || "エラーだみつ";
                 
-                // ここで「IMAGE_GEN:」を検知して画像タグに変換
+                // 画像タグ変換処理
                 const formattedReply = formatContent(reply);
                 
                 document.getElementById(loadingId).parentElement.innerHTML = formattedReply;
-                
                 allSessions[currentSessionId].messages.push({ role: "assistant", content: reply });
                 saveToLocalStorage();
             } catch (e) {
@@ -136,20 +134,22 @@ IMAGE_GEN: 【依頼内容を英語に翻訳した短いプロンプト】
             }
         }
 
-        // ★修正の肝：AIが出した「IMAGE_GEN: cat」を、正しいURLに変換する処理
+        // ★ここを強化修正：「だみつ」削除フィルターを追加★
         function formatContent(content) {
             if (!content) return "";
             
-            // "IMAGE_GEN: プロンプト" を検知して画像タグにする
-            // ここで encodeURIComponent を使うので、URLが壊れない
             let formatted = content.replace(/IMAGE_GEN:\s*(.+)/g, (match, prompt) => {
-                const safePrompt = encodeURIComponent(prompt.trim());
+                // 1. プロンプトから「だみつ」や「。」を除去する
+                let cleanPrompt = prompt.replace(/だみつ/g, '').replace(/。/g, '').trim();
+                
+                // 2. URLエンコードしてURLを作成
+                const safePrompt = encodeURIComponent(cleanPrompt);
                 const seed = Math.floor(Math.random() * 100000);
                 const url = `https://image.pollinations.ai/prompt/${safePrompt}?width=1024&height=1024&nologo=true&seed=${seed}&model=flux`;
+                
                 return `描けたよ！🍯<br><img src="${url}" alt="Generating Image..." onload="this.style.background='transparent'">`;
             });
 
-            // 普通の改行も反映
             return formatted.replace(/\n/g, '<br>');
         }
 

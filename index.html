@@ -1,42 +1,234 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>AI Image Generator</title>
+<meta charset="UTF-8">
+<title>HoneyAI</title>
+
+<style>
+body{
+  background:#0f0f18;
+  color:#eee;
+  font-family:Arial, sans-serif;
+  padding:20px;
+}
+
+h1{
+  color:#ff99cc;
+}
+
+select,input,button{
+  padding:8px;
+  border-radius:6px;
+  border:none;
+  margin:4px;
+}
+
+button{
+  background:#ff4da6;
+  color:white;
+  cursor:pointer;
+}
+
+button:hover{
+  opacity:0.8;
+}
+
+#chatBox{
+  background:#1a1a24;
+  padding:15px;
+  height:320px;
+  overflow-y:auto;
+  margin-top:10px;
+  border-radius:10px;
+}
+
+.user{
+  color:#66ccff;
+  margin-bottom:8px;
+}
+
+.ai{
+  color:#ff99cc;
+  margin-bottom:8px;
+}
+
+img{
+  max-width:350px;
+  margin-top:15px;
+  border-radius:12px;
+}
+</style>
 </head>
 <body>
 
+<h1>HoneyAI</h1>
+
+<div>
+<label>性格設定:</label>
+<select id="personality">
+  <option value="クール">クール</option>
+  <option value="甘えん坊">甘えん坊</option>
+  <option value="知的">知的</option>
+  <option value="ツンデレ">ツンデレ</option>
+</select>
+<button onclick="initCharacter()">設定</button>
+</div>
+
+<hr>
+
 <h2>画像生成</h2>
-
-<input id="prompt" placeholder="プロンプト入力">
+<input id="imagePrompt" placeholder="画像プロンプト">
 <button onclick="generateImage()">生成</button>
+<br>
+<img id="output">
 
-<br><br>
-<img id="output" width="512">
+<hr>
+
+<h2>会話</h2>
+<div id="chatBox"></div>
+
+<input id="chatInput" placeholder="話しかける">
+<button onclick="talk()">送信</button>
 
 <script>
-async function generateImage() {
+let character = null;
 
-  const prompt = document.getElementById("prompt").value;
+/* ===============================
+   初期化 & ロード
+=================================*/
 
-  const response = await fetch("/api/image", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ prompt })
+function initCharacter(){
+  const personality =
+    document.getElementById("personality").value;
+
+  character = {
+    personality: personality,
+    hiddenPersonality: "優しい", // 内部固定
+    memory: []
+  };
+
+  localStorage.setItem("honeyAI_data",
+    JSON.stringify(character));
+
+  alert("HoneyAIの性格を設定しました。");
+}
+
+function loadCharacter(){
+  const saved =
+    localStorage.getItem("honeyAI_data");
+
+  if(saved){
+    character = JSON.parse(saved);
+  }
+}
+
+loadCharacter();
+
+/* ===============================
+   画像生成
+=================================*/
+
+async function generateImage(){
+
+  const prompt =
+    document.getElementById("imagePrompt").value;
+
+  const response = await fetch("/api/image",{
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body:JSON.stringify({ prompt })
   });
 
-  if (!response.ok) {
-    console.log(await response.text());
-    alert("エラー出てる。コンソール見て。");
+  if(!response.ok){
+    alert("画像生成エラー");
     return;
   }
 
   const blob = await response.blob();
-  const imgURL = URL.createObjectURL(blob);
+  document.getElementById("output").src =
+    URL.createObjectURL(blob);
+}
 
-  document.getElementById("output").src = imgURL;
+/* ===============================
+   会話
+=================================*/
+
+async function talk(){
+
+  if(!character){
+    alert("先に性格設定してください。");
+    return;
+  }
+
+  const input =
+    document.getElementById("chatInput").value;
+
+  appendMessage("あなた",input,"user");
+
+  character.memory.push({
+    role:"user",
+    content:input
+  });
+
+  // 履歴文字列作成
+  const history =
+    character.memory
+      .map(m=>`${m.role}:${m.content}`)
+      .join("\n");
+
+  const systemPrompt = `
+あなたはHoneyAIです。
+
+表の性格: ${character.personality}
+隠し性格: 優しい（根底に必ず思いやりを持つ）
+
+これまでの会話:
+${history}
+
+HoneyAIとして自然で一貫した人格で返答してください。
+`;
+
+  const response = await fetch("/api/chat",{
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body:JSON.stringify({ prompt: systemPrompt })
+  });
+
+  const data = await response.json();
+
+  const reply =
+    data.reply || "......";
+
+  appendMessage("HoneyAI",reply,"ai");
+
+  character.memory.push({
+    role:"ai",
+    content:reply
+  });
+
+  localStorage.setItem(
+    "honeyAI_data",
+    JSON.stringify(character)
+  );
+
+  document.getElementById("chatInput").value="";
+}
+
+/* ===============================
+   表示処理
+=================================*/
+
+function appendMessage(name,text,cls){
+
+  const box =
+    document.getElementById("chatBox");
+
+  box.innerHTML +=
+    `<div class="${cls}">
+       <b>${name}:</b> ${text}
+     </div>`;
+
+  box.scrollTop = box.scrollHeight;
 }
 </script>
 

@@ -11,6 +11,43 @@ module.exports = async function handler(req, res) {
     }
 
     try {
+        const { messages, systemPrompt } = req.body;
+
+        // システムプロンプトを会話の先頭に追加
+        const conversation = [
+            { 
+                role: "system", 
+                content: systemPrompt || "あなたは親切なAIアシスタントです。" 
+            },
+            ...messages
+        ];
+
+        const completion = await groq.chat.completions.create({
+            messages: conversation,
+            model: "llama-3.3-70b-versatile", // 最新の推奨モデル
+            temperature: 0.7,
+        });
+
+        const reply = completion.choices[0]?.message?.content || "返答がありませんでした";
+        return res.status(200).json({ reply });
+
+    } catch (error) {
+        console.error('Groq API Error:', error);
+        return res.status(500).json({ error: error.message || 'Server Error' });
+    }
+};// api/chat.js
+const Groq = require('groq-sdk');
+
+const groq = new Groq({
+    apiKey: process.env.GROQ_API_KEY
+});
+
+module.exports = async function handler(req, res) {
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    try {
         // フロントエンドから「性格(systemPrompt)」と「会話履歴(messages)」を受け取る
         const { messages, systemPrompt } = req.body;
 

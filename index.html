@@ -47,16 +47,22 @@
 
         <div id="settings-panel">
             <label style="font-size:0.8rem; font-weight:bold;">性格・画像生成ルール</label>
-            <textarea id="system-prompt" rows="8" style="width:100%; font-size:0.75rem; margin-top:5px; padding:5px; border:1px solid #ccc; border-radius:5px;">あなたはハチミツの妖精HoneyAIです。普段の語尾は「〜だみつ」。
+            <textarea id="system-prompt" rows="10" style="width:100%; font-size:0.75rem; margin-top:5px; padding:5px; border:1px solid #ccc; border-radius:5px;">あなたはハチミツの妖精HoneyAIです。語尾は「〜だみつ」。
 
-【画像生成の絶対ルール】
-ユーザーから「絵を描いて」等の依頼があった場合、以下のキーワードのみを出力してください。
-この行には絶対に「だみつ」や日本語をつけないでください。英語のみです。
-IMAGE_GEN: 【依頼内容を英語に翻訳した短いプロンプト】
+【行動ルール】
+1. ユーザーが「絵を描いて」「画像にして」と明確に頼んだ場合のみ、画像生成を行ってください。
+2. それ以外の普通の会話では、絶対に画像生成コマンドを出さないでください。親切に会話してください。
+
+【画像生成コマンドの形式】
+画像を作る時は、説明を一切せず、以下の行だけを出力します（日本語禁止、英語のみ）。
+IMAGE_GEN: english_prompt_here
 
 例:
+ユーザー「こんにちは」
+あなた「こんにちはだみつ！今日はいい天気だみつね。」
+
 ユーザー「猫の絵を描いて」
-あなた「IMAGE_GEN: a cute cat, soft lighting, 4k」</textarea>
+あなた「IMAGE_GEN: cute cat, fluffy, 4k」</textarea>
             <button onclick="toggleSettings()" style="width:100%; margin-top:10px; cursor:pointer;">設定を閉じる</button>
         </div>
 
@@ -134,15 +140,21 @@ IMAGE_GEN: 【依頼内容を英語に翻訳した短いプロンプト】
             }
         }
 
-        // ★ここを強化修正：「だみつ」削除フィルターを追加★
         function formatContent(content) {
             if (!content) return "";
             
+            // "IMAGE_GEN: プロンプト" を検知
             let formatted = content.replace(/IMAGE_GEN:\s*(.+)/g, (match, prompt) => {
-                // 1. プロンプトから「だみつ」や「。」を除去する
-                let cleanPrompt = prompt.replace(/だみつ/g, '').replace(/。/g, '').trim();
+                // 1. ゴミ掃除: 「だみつ」や記号、日本語を消す
+                // 英語とカンマ、数字だけ残すフィルター
+                let cleanPrompt = prompt.replace(/[^a-zA-Z0-9,\s]/g, '').trim();
+
+                // もし空っぽになっちゃったら、デフォルトの猫にする (Error 1033回避)
+                if (!cleanPrompt || cleanPrompt.length < 3) {
+                    cleanPrompt = "cute cat"; 
+                }
                 
-                // 2. URLエンコードしてURLを作成
+                // 2. URL作成
                 const safePrompt = encodeURIComponent(cleanPrompt);
                 const seed = Math.floor(Math.random() * 100000);
                 const url = `https://image.pollinations.ai/prompt/${safePrompt}?width=1024&height=1024&nologo=true&seed=${seed}&model=flux`;

@@ -1,3 +1,4 @@
+console.log("HF:", process.env.HF_API_KEY);
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).end();

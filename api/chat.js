@@ -1,6 +1,6 @@
 // api/chat.js
 export const config = {
-  runtime: "edge", // Vercelのエッジ機能を使う
+  runtime: "edge",
 };
 
 export default async function handler(req) {
@@ -9,14 +9,14 @@ export default async function handler(req) {
   }
 
   try {
-    const { messages, systemPrompt, modelId } = await req.json();
+    // フロントエンドから設定値を受け取る
+    const { messages, systemPrompt, modelId, maxTokens } = await req.json();
     const apiKey = process.env.GROQ_API_KEY;
 
     if (!apiKey) {
       return new Response(JSON.stringify({ error: "APIキーが設定されていません" }), { status: 500 });
     }
 
-    // Groq APIへリクエスト
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -25,13 +25,15 @@ export default async function handler(req) {
       },
       body: JSON.stringify({
         messages: [
+          // システムプロンプト（ここに文字数指示も含まれて届く）
           { role: "system", content: systemPrompt },
           ...messages
         ],
         model: modelId || "llama-3.3-70b-versatile",
         stream: true,
-        temperature: 0.6, // 少し下げて発言を安定させる
-        max_tokens: 4096  // 長文でも切れないように確保
+        temperature: 0.6,
+        // APIのハードリミット（最大トークン数）
+        max_tokens: parseInt(maxTokens) || 4096 
       }),
     });
 
@@ -41,42 +43,26 @@ export default async function handler(req) {
     }
 
     const reader = response.body.getReader();
-    const encoder = new TextEncoder();
     const decoder = new TextDecoder();
+    const encoder = new TextEncoder();
 
     const stream = new ReadableStream({
       async start(controller) {
-        let buffer = ""; // ★ここが重要：データを一時保存する場所
-
+        let buffer = ""; 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-
-          // 届いたデータを文字に変換してバッファに追加
           buffer += decoder.decode(value, { stream: true });
-          
-          // 改行で行ごとに分ける
           const lines = buffer.split("\n");
-          
-          // ★最後の行は「まだ途中」の可能性が高いので、次の処理に持ち越す（ここが途切れ防止の肝！）
           buffer = lines.pop();
-
           for (const line of lines) {
-            const trimmedLine = line.trim();
-            if (!trimmedLine || trimmedLine === "data: [DONE]") continue;
-            
-            if (trimmedLine.startsWith("data: ")) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith("data: ") && trimmed !== "data: [DONE]") {
               try {
-                // "data: " の後ろのJSONを取り出す
-                const json = JSON.parse(trimmedLine.substring(6));
+                const json = JSON.parse(trimmed.substring(6));
                 const content = json.choices[0]?.delta?.content || "";
-                if (content) {
-                  controller.enqueue(encoder.encode(content));
-                }
-              } catch (e) {
-                // JSONが壊れていても無視して次へ（止まらないようにする）
-                console.error("JSON Parse Error:", e);
-              }
+                if (content) controller.enqueue(encoder.encode(content));
+              } catch (e) { }
             }
           }
         }
@@ -85,11 +71,7 @@ export default async function handler(req) {
     });
 
     return new Response(stream, {
-      headers: { 
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        "Connection": "keep-alive"
-      },
+      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
     });
 
   } catch (error) {

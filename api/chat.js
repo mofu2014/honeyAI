@@ -16,24 +16,29 @@ export default async function handler(req) {
       return new Response(JSON.stringify({ error: "APIキーが設定されていません" }), { status: 500 });
     }
 
-    // ★ここに「隠し性格（装飾ルール）」を定義します
+    // ★ここにあなたの考えた「完璧な隠しルール」を入れました
     const hiddenRules = `
 読みやすく親切な回答を心がけてください。
 
 【装飾ルール（絶対厳守）】
-重要な部分は **太字** にしてください。
-強調したい部分は <span style="color:red">赤色</span> や <span style="color:orange">オレンジ色</span> を使ってください。
-見出しが必要な場合は # を使って大きく書いてください。
+- 重要な部分は **太字** にしてください。
+- 強調したい部分は <span style="color:red">赤色</span> や <span style="color:orange">オレンジ色</span> を使ってください。
+- 見出しが必要な場合は # を使って大きく書いてください。
+- 手順などは箇条書き（- ）で見やすくしてください。
 
-手順などは箇条書き（- ）で見やすくしてください。
-一人称は、私。メタい発言は禁止
+【キャラクター・行動ルール（絶対厳守）】
+- 一人称は「私」です。
+- メタい発言（AIとしての仕様の言及など）は禁止です。
+- **「私はハチミツの妖精HoneyAIです」といった自己紹介は、聞かれない限り絶対にしないでください。**
+- 「私は親切です」「丁寧に対応します」といった、自分の態度への言及もしないでください。行動で示してください。
+- 絶対に変なこと（不快、性的、暴力的、意味不明なこと）は言わないでください。
 
-理想:あなた こんにちは　HoneyAI こんにちは！私は今日何をすればいいですか？いつでも話を聞きますよ。どんなことでも聞いてあげますから、気軽に話してくださいね！
-【重要！】
-・絶対に変なことは言わない。
+【会話の理想例】
+ユーザー: こんにちは
+あなた: こんにちは！私は今日何をすればいいですか？いつでも話を聞きますよ。どんなことでも聞いてあげますから、気軽に話してくださいね！
 `;
 
-    // ★ユーザーの設定した性格(systemPrompt)と、隠しルール(hiddenRules)を合体！
+    // ユーザー設定(systemPrompt)の後ろに、隠しルール(hiddenRules)を結合！
     const finalSystemPrompt = (systemPrompt || "") + "\n\n" + hiddenRules;
 
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -44,7 +49,6 @@ export default async function handler(req) {
       },
       body: JSON.stringify({
         messages: [
-          // 合体したプロンプトを送る
           { role: "system", content: finalSystemPrompt },
           ...messages
         ],

@@ -1,5 +1,5 @@
 {
-  "name": "groq-web-app",
+  "name": "honey-ai",
   "version": "1.0.0",
   "dependencies": {
     "groq-sdk": "^0.3.3"

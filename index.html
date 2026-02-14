@@ -1,210 +1,42 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HoneyAI</title>
-
-<style>
-:root{
-  --honey-main:#f4b400;
-  --honey-light:#ffd54f;
-  --honey-dark:#c88719;
-  --bg-light:#fff8e1;
-  --bg-dark:#1c1a16;
-  --text-light:#2b2b2b;
-  --text-dark:#f5f5f5;
-}
-
-body{
-  margin:0;
-  transition:0.3s;
-}
-
-body.light{
-  background:var(--bg-light);
-  color:var(--text-light);
-}
-body.dark{
-  background:var(--bg-dark);
-  color:var(--text-dark);
-}
-
-/* 六角形背景 */
-body::before{
-  content:"";
-  position:fixed;
-  inset:0;
-  background-image:
-  radial-gradient(circle at 25px 25px, rgba(0,0,0,0.04) 2px, transparent 2px);
-  background-size:50px 50px;
-  opacity:0.3;
-  pointer-events:none;
-}
-
-header{
-  padding:15px;
-  text-align:center;
-  font-size:22px;
-  background:linear-gradient(135deg,var(--honey-light),var(--honey-main));
-}
-
-.controls{
-  display:flex;
-  flex-wrap:wrap;
-  gap:10px;
-  padding:10px;
-  justify-content:center;
-}
-
-input, select, button{
-  padding:8px 12px;
-  border-radius:20px;
-  border:none;
-}
-
-.chat{
-  height:55vh;
-  overflow-y:auto;
-  padding:20px;
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-
-.message{
-  max-width:70%;
-  padding:12px 16px;
-  border-radius:20px;
-}
-
-.user{
-  align-self:flex-end;
-  background:#ddd;
-}
-
-.ai{
-  align-self:flex-start;
-  background:linear-gradient(135deg,var(--honey-light),var(--honey-main));
-}
-
-.input-area{
-  display:flex;
-  gap:10px;
-  padding:10px;
-}
-
-img{
-  max-width:250px;
-  border-radius:10px;
-  margin-top:8px;
-}
-</style>
 </head>
+<body>
 
-<body class="light">
+<h2>HoneyAI</h2>
 
-<header>HoneyAI</header>
+<div id="chat"></div>
 
-<div class="controls">
-  <!-- 性格自由入力 -->
-  <input type="text" id="personality" placeholder="性格を入力（例: 敬語×なれなれしい）">
-
-  <!-- フォント選択 -->
-  <select id="fontSelect">
-    <option value="sans-serif">標準</option>
-    <option value="serif">Serif</option>
-    <option value="monospace">Monospace</option>
-    <option value="cursive">Cursive</option>
-  </select>
-
-  <!-- テーマ -->
-  <select id="theme">
-    <option value="light">ライト</option>
-    <option value="dark">ブラック</option>
-    <option value="system">システム</option>
-  </select>
-</div>
-
-<div class="chat" id="chat"></div>
-
-<div class="input-area">
-  <input type="text" id="input" placeholder="メッセージを入力">
-  <button onclick="sendMessage()">送信</button>
-  <button onclick="generateImage()">画像生成</button>
-</div>
+<input id="input" placeholder="メッセージ">
+<button onclick="send()">送信</button>
 
 <script>
-const chat=document.getElementById("chat");
-const input=document.getElementById("input");
+async function send(){
+  const input = document.getElementById("input");
+  const chat = document.getElementById("chat");
 
-/* フォント変更 */
-document.getElementById("fontSelect").addEventListener("change",(e)=>{
-  document.body.style.fontFamily=e.target.value;
-});
-
-/* テーマ切替 */
-document.getElementById("theme").addEventListener("change",(e)=>{
-  const value=e.target.value;
-  if(value==="system"){
-    const dark=window.matchMedia("(prefers-color-scheme: dark)").matches;
-    document.body.className=dark?"dark":"light";
-  }else{
-    document.body.className=value;
-  }
-});
-
-/* メッセージ表示 */
-function addMessage(text,type){
-  const div=document.createElement("div");
-  div.className="message "+type;
-  div.textContent=text;
-  chat.appendChild(div);
-  chat.scrollTop=chat.scrollHeight;
-}
-
-/* 送信 */
-async function sendMessage(){
-  const text=input.value.trim();
+  const text = input.value.trim();
   if(!text) return;
 
-  addMessage(text,"user");
-  input.value="";
+  chat.innerHTML += "<div>あなた: " + text + "</div>";
+  input.value = "";
 
-  const personality=document.getElementById("personality").value;
-
-  const res=await fetch("/api/chat",{
+  const res = await fetch("/api/chat",{
     method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({
-      message:text,
-      personality:personality
+    headers:{
+      "Content-Type":"application/json"
+    },
+    body: JSON.stringify({
+      message: text
     })
   });
 
-  const data=await res.json();
-  addMessage(data.reply,"ai");
-}
+  const data = await res.json();
 
-/* 画像生成 */
-async function generateImage(){
-  const prompt=input.value.trim();
-  if(!prompt) return;
-
-  addMessage("画像生成中...","ai");
-
-  const res=await fetch("/api/image",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({prompt})
-  });
-
-  const data=await res.json();
-
-  const img=document.createElement("img");
-  img.src=data.image;
-  chat.appendChild(img);
-  chat.scrollTop=chat.scrollHeight;
+  chat.innerHTML += "<div>AI: " + (data.reply || data.error) + "</div>";
 }
 </script>
 

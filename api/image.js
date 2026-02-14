@@ -1,61 +1,39 @@
 // api/image.js
+// Pollinations.ai を使った画像生成（APIキー不要・無料・高速）
+
 module.exports = async function handler(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
     const { prompt } = req.body;
-    const apiKey = process.env.HF_API_KEY;
-
-    if (!apiKey) {
-        console.error("HF_API_KEY missing");
-        return res.status(500).json({ error: 'APIキー設定エラー: HF_API_KEYがありません' });
-    }
-
-// 変更前
-//const model = "runwayml/stable-diffusion-v1-5";
-// 変更後（最新の安定モデル）
-const model = "black-forest-labs/FLUX.1-schnell";
+    
+    // 日本語のプロンプトだと精度が落ちることがあるので、URLエンコードする
+    // seedをランダムにすることで、毎回違う絵が出るようにする
+    const seed = Math.floor(Math.random() * 100000);
+    const imageUrl = `https://pollinations.ai/p/${encodeURIComponent(prompt)}?width=1024&height=1024&seed=${seed}&model=flux`;
 
     try {
-        console.log(`Generating image for: ${prompt}`);
+        console.log(`Generating image via Pollinations: ${prompt}`);
 
-        const response = await fetch(
-            `https://api-inference.huggingface.co/models/${model}`,
-            {
-                headers: {
-                    Authorization: `Bearer ${apiKey}`,
-                    "Content-Type": "application/json",
-                    "x-wait-for-model": "true" // モデル起動待ち
-                },
-                method: "POST",
-                body: JSON.stringify({ inputs: prompt }),
-            }
-        );
+        // 画像データを取得
+        const response = await fetch(imageUrl);
 
-        // エラーハンドリング
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error("HF API Error:", errorText);
-            
-            // よくあるエラーを親切に返す
-            if (response.status === 503 || errorText.includes("loading")) {
-                return res.status(503).json({ error: "モデル起動中です。もう一度ボタンを押してください！" });
-            }
-            if (response.status === 410) {
-                return res.status(410).json({ error: "このモデルは現在利用できません(410)。HuggingFace側の制限です。" });
-            }
-            return res.status(response.status).json({ error: `画像生成失敗: ${errorText}` });
+            throw new Error(`Pollinations API Error: ${response.status}`);
         }
 
+        // 画像データをバッファとして取得
         const arrayBuffer = await response.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
+        
+        // Base64に変換してフロントエンドに返す
         const base64Image = `data:image/jpeg;base64,${buffer.toString('base64')}`;
 
         return res.status(200).json({ image: base64Image });
 
     } catch (error) {
-        console.error("Server Error:", error);
-        return res.status(500).json({ error: error.message });
+        console.error("Image Generation Error:", error);
+        return res.status(500).json({ error: "画像生成に失敗しました（Pollinations）" });
     }
 };

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HoneyAI Pro 🍯</title>
+    <title>HoneyAI</title>
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
     <!-- 外部ライブラリの読み込み -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -139,7 +139,7 @@
 
     <script>
         // デフォルトのプロンプト（エラー防止のため安全な記述に）
-        const DEFAULT_PROMPT = "あなたはハチミツの妖精HoneyAIです。語尾は「〜だみつ」。\n読みやすく親切な回答を心がけてください。\n\n【装飾ルール】\n重要な部分は **太字** にしてください。\n強調したい部分は <span style=\"color:red\">赤色</span> や <span style=\"color:orange\">オレンジ色</span> を使ってください。\n見出しが必要な場合は # を使って大きく書いてください。\n手順などは箇条書き（- ）で見やすくしてください。";
+        const DEFAULT_PROMPT = "あなたはハチミツの妖精HoneyAIです。\n読みやすく親切な回答を心がけてください。\n\n【装飾ルール】\n重要な部分は **太字** にしてください。\n強調したい部分は <span style=\"color:red\">赤色</span> や <span style=\"color:orange\">オレンジ色</span> を使ってください。\n見出しが必要な場合は # を使って大きく書いてください。\n手順などは箇条書き（- ）で見やすくしてください。";
 
         // --- データ管理 ---
         let allSessions = {};
@@ -198,7 +198,7 @@
         function startNewChat() {
             currentSessionId = Date.now().toString();
             allSessions[currentSessionId] = { title: "新しいプロジェクト", messages: [], timestamp: Date.now() };
-            chatBox.innerHTML = '<div style="text-align:center; color:#ccc; margin-top:50px;">🍯 新しいプロジェクトだみつ！<br><b>太字</b>や<span style="color:orange">色付き</span>で返事できるよ！</div>';
+            chatBox.innerHTML = '<div style="text-align:center; color:#ccc; margin-top:50px;">🍯 新しいプロジェクトです！<br><b>太字</b>や<span style="color:orange">色付き</span>で返事できるよ！</div>';
             renderHistoryList();
             if(window.innerWidth <= 600) document.getElementById('sidebar').classList.remove('open');
         }
@@ -376,7 +376,7 @@
             appSettings.userProfession = document.getElementById('user-profession').value;
             
             localStorage.setItem('honeyai_settings', JSON.stringify(appSettings));
-            alert('設定を保存したみつ！');
+            alert('設定を保存しました！');
             toggleSettings();
         }
 

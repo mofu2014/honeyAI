@@ -1,44 +1,55 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-<meta charset="UTF-8">
-<title>HoneyAI</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Groq Chat Demo</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 2rem auto; padding: 0 1rem; }
+        #chat-box { border: 1px solid #ccc; padding: 1rem; height: 300px; overflow-y: scroll; margin-bottom: 1rem; background: #f9f9f9; }
+        .message { margin-bottom: 0.5rem; }
+        .user { color: blue; font-weight: bold; }
+        .ai { color: green; }
+    </style>
 </head>
 <body>
+    <h1>Groq Chat on Vercel</h1>
+    <div id="chat-box"></div>
+    <input type="text" id="user-input" placeholder="メッセージを入力..." style="width: 70%;">
+    <button onclick="sendMessage()">送信</button>
 
-<h2>HoneyAI</h2>
+    <script>
+        async function sendMessage() {
+            const input = document.getElementById('user-input');
+            const chatBox = document.getElementById('chat-box');
+            const text = input.value;
+            if (!text) return;
 
-<div id="chat"></div>
+            // 画面に自分のメッセージを表示
+            chatBox.innerHTML += `<div class="message"><span class="user">あなた:</span> ${text}</div>`;
+            input.value = '';
 
-<input id="input" placeholder="メッセージ">
-<button onclick="send()">送信</button>
+            try {
+                // Vercelのサーバーレス関数(/api/chat)にデータを送る
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
 
-<script>
-async function send(){
-  const input = document.getElementById("input");
-  const chat = document.getElementById("chat");
-
-  const text = input.value.trim();
-  if(!text) return;
-
-  chat.innerHTML += "<div>あなた: " + text + "</div>";
-  input.value = "";
-
-  const res = await fetch("/api/chat",{
-    method:"POST",
-    headers:{
-      "Content-Type":"application/json"
-    },
-    body: JSON.stringify({
-      message: text
-    })
-  });
-
-  const data = await res.json();
-
-  chat.innerHTML += "<div>AI: " + (data.reply || data.error) + "</div>";
-}
-</script>
-
+                const data = await response.json();
+                
+                // AIの返答を表示
+                const aiResponse = data.reply || "エラーが発生しました";
+                chatBox.innerHTML += `<div class="message"><span class="ai">Groq:</span> ${aiResponse}</div>`;
+            } catch (error) {
+                console.error('Error:', error);
+                chatBox.innerHTML += `<div class="message" style="color:red;">通信エラーが発生しました</div>`;
+            }
+            
+            // スクロールを一番下へ
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    </script>
 </body>
 </html>

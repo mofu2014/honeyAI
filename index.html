@@ -6,13 +6,8 @@
     <title>HoneyAI 🍯</title>
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --honey-dark: #8B4513; --honey-gold: #FFC107; --honey-light: #FFF8E1;
-            --honey-accent: #FF9800; --sidebar-bg: #FDF5E6;
-        }
+        :root { --honey-dark: #8B4513; --honey-gold: #FFC107; --honey-light: #FFF8E1; --honey-accent: #FF9800; --sidebar-bg: #FDF5E6; }
         body { font-family: 'M PLUS Rounded 1c', sans-serif; background: var(--honey-light); margin: 0; display: flex; height: 100vh; color: var(--honey-dark); overflow: hidden; }
-        
-        /* サイドバー */
         .sidebar { width: 260px; background: var(--sidebar-bg); border-right: 2px solid #FFE082; display: flex; flex-direction: column; padding: 15px; flex-shrink: 0; transition: 0.3s; }
         .new-chat-btn { background: var(--honey-gold); border: none; padding: 12px; border-radius: 20px; font-weight: bold; cursor: pointer; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .history-list { flex-grow: 1; overflow-y: auto; }
@@ -20,29 +15,20 @@
         .history-item.active { background: #FFE082; font-weight: bold; }
         .delete-btn { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #888; cursor: pointer; display: none; }
         .history-item:hover .delete-btn { display: block; }
-
-        /* メイン */
         .main-content { flex-grow: 1; display: flex; flex-direction: column; background: white; width: 100%; }
         header { padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; color: var(--honey-accent); font-weight: bold; }
         #chat-box { flex-grow: 1; padding: 20px; overflow-y: auto; background-image: radial-gradient(#FFF8E1 20%, transparent 20%); background-size: 20px 20px; }
-        
-        /* メッセージ */
         .message { margin-bottom: 20px; display: flex; flex-direction: column; }
         .bubble { max-width: 80%; padding: 12px 16px; border-radius: 18px; line-height: 1.6; font-size: 0.95rem; word-wrap: break-word; }
         .user-msg { align-items: flex-end; }
         .user-msg .bubble { background: var(--honey-accent); color: white; border-bottom-right-radius: 4px; }
         .ai-msg { align-items: flex-start; }
         .ai-msg .bubble { background: var(--honey-light); border: 1px solid #FFE082; border-bottom-left-radius: 4px; }
-        /* 画像のスタイル */
-        .bubble img { width: 100%; max-width: 400px; border-radius: 10px; margin-top: 10px; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: block; }
-
-        /* 入力 */
+        .bubble img { width: 100%; max-width: 400px; border-radius: 10px; margin-top: 10px; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: block; min-height: 200px; background: #f0f0f0; }
         .input-area { padding: 15px; border-top: 1px solid #eee; display: flex; gap: 10px; }
         input { flex-grow: 1; padding: 12px; border: 2px solid #ddd; border-radius: 25px; outline: none; }
         .send-btn { background: var(--honey-gold); border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; color: white; font-size: 1.2rem; }
-
         #settings-panel { display: none; position: absolute; top: 60px; right: 20px; background: white; border: 2px solid var(--honey-gold); padding: 15px; border-radius: 10px; z-index: 100; width: 280px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        
         @media (max-width: 600px) { .sidebar { position: absolute; height: 100%; z-index: 1000; transform: translateX(-100%); } .sidebar.open { transform: translateX(0); } }
     </style>
 </head>
@@ -64,10 +50,14 @@
             <textarea id="system-prompt" rows="8" style="width:100%; font-size:0.75rem; margin-top:5px; padding:5px; border:1px solid #ccc; border-radius:5px;">あなたはハチミツの妖精HoneyAIです。語尾は「〜だみつ」。
 
 【画像生成のルール】
-ユーザーから「絵を描いて」「画像を作って」等の依頼があった場合、言葉での説明は省略し、必ず以下のMarkdown形式のURLのみを出力してください。
-![image](https://image.pollinations.ai/prompt/【依頼内容を英語に翻訳した詳細なプロンプト】?width=1024&height=1024&nologo=true&seed=【ランダムな数字】)
+ユーザーから「絵を描いて」「画像を作って」等の依頼があった場合、説明は省略し、以下のキーワードのみを出力してください。
+IMAGE_GEN: 【依頼内容を英語に翻訳した短いプロンプト】
 
-それ以外の会話は、優しく親切に日本語で答えてください。</textarea>
+例:
+ユーザー「猫の絵を描いて」
+あなた「IMAGE_GEN: a cute cat, soft lighting, 4k」
+
+それ以外は優しく日本語で話してください。</textarea>
             <button onclick="toggleSettings()" style="width:100%; margin-top:10px; cursor:pointer;">設定を閉じる</button>
         </div>
 
@@ -80,44 +70,28 @@
     </main>
 
     <script>
-        // ★ここを修正：データの読み込みエラーを防ぐ安全装置を追加
         let allSessions = {};
         try {
             const saved = localStorage.getItem('honeyai_sessions');
-            if (saved) {
-                allSessions = JSON.parse(saved);
-            }
-        } catch (e) {
-            console.error("履歴データの読み込みに失敗しました:", e);
-            allSessions = {}; // 壊れていたらリセット
-        }
+            if (saved) allSessions = JSON.parse(saved);
+        } catch (e) { allSessions = {}; }
 
         let currentSessionId = null;
         const chatBox = document.getElementById('chat-box');
         const userInput = document.getElementById('user-input');
 
-        // ページ読み込み時にチャットを開始
-        window.onload = function() {
-            renderHistoryList();
-            startNewChat();
-        };
+        window.onload = function() { renderHistoryList(); startNewChat(); };
 
-        // 新しいチャットを開始する関数
         function startNewChat() {
             currentSessionId = Date.now().toString();
             allSessions[currentSessionId] = { title: "新しい会話", messages: [], timestamp: Date.now() };
             chatBox.innerHTML = '<div style="text-align:center; color:#ccc; margin-top:50px;">🍯 お話しするか、「猫の絵を描いて」と頼んでみてね！</div>';
             renderHistoryList();
-            // スマホならサイドバーを閉じる
             if(window.innerWidth <= 600) document.getElementById('sidebar').classList.remove('open');
         }
 
-        // 画面とデータにメッセージを追加する共通関数
         function processUserMessage(text) {
-            if (!allSessions[currentSessionId]) {
-                startNewChat();
-            }
-            // 最初のメッセージならタイトルを設定
+            if (!allSessions[currentSessionId]) startNewChat();
             if (allSessions[currentSessionId].messages.length === 0) {
                 allSessions[currentSessionId].title = text.substring(0, 15);
                 chatBox.innerHTML = ''; 
@@ -129,18 +103,15 @@
             userInput.value = '';
         }
 
-        // メッセージ送信関数
         async function sendMessage() {
             const text = userInput.value.trim();
             if (!text) return;
 
             processUserMessage(text);
-
             const loadingId = 'L' + Date.now();
             appendMessage('assistant', '<span id="'+loadingId+'">🍯 考え中だみつ...</span>');
             
             try {
-                // Groq API (/api/chat) を呼び出す
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -152,33 +123,36 @@
                 const data = await response.json();
                 const reply = data.reply || "エラーだみつ";
                 
-                // ロード中の表示を消して、AIの返答に書き換え（Markdown画像変換込み）
-                const loadingEl = document.getElementById(loadingId);
-                if (loadingEl) {
-                    loadingEl.parentElement.innerHTML = formatContent(reply);
-                }
+                // ここで「IMAGE_GEN:」を検知して画像タグに変換
+                const formattedReply = formatContent(reply);
+                
+                document.getElementById(loadingId).parentElement.innerHTML = formattedReply;
                 
                 allSessions[currentSessionId].messages.push({ role: "assistant", content: reply });
                 saveToLocalStorage();
-
             } catch (e) {
-                const loadingEl = document.getElementById(loadingId);
-                if (loadingEl) loadingEl.innerText = "通信エラーだみつ...";
-                console.error(e);
+                const el = document.getElementById(loadingId);
+                if(el) el.innerText = "通信エラーだみつ...";
             }
         }
 
-        // コンテンツの整形（Markdown画像記法をimgタグに変換）
+        // ★修正の肝：AIが出した「IMAGE_GEN: cat」を、正しいURLに変換する処理
         function formatContent(content) {
             if (!content) return "";
-            // ![image](url) を <img src="url"> に変換
-            let formatted = content.replace(/!\[image\]\((.*?)\)/g, '<img src="$1" alt="Generated Image">');
-            // 改行を <br> に変換
-            formatted = formatted.replace(/\n/g, '<br>');
-            return formatted;
+            
+            // "IMAGE_GEN: プロンプト" を検知して画像タグにする
+            // ここで encodeURIComponent を使うので、URLが壊れない
+            let formatted = content.replace(/IMAGE_GEN:\s*(.+)/g, (match, prompt) => {
+                const safePrompt = encodeURIComponent(prompt.trim());
+                const seed = Math.floor(Math.random() * 100000);
+                const url = `https://image.pollinations.ai/prompt/${safePrompt}?width=1024&height=1024&nologo=true&seed=${seed}&model=flux`;
+                return `描けたよ！🍯<br><img src="${url}" alt="Generating Image..." onload="this.style.background='transparent'">`;
+            });
+
+            // 普通の改行も反映
+            return formatted.replace(/\n/g, '<br>');
         }
 
-        // 画面にメッセージを追加
         function appendMessage(role, content) {
             const div = document.createElement('div');
             div.className = `message ${role === 'user' ? 'user-msg' : 'ai-msg'}`;
@@ -188,9 +162,7 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        function saveToLocalStorage() { 
-            localStorage.setItem('honeyai_sessions', JSON.stringify(allSessions)); 
-        }
+        function saveToLocalStorage() { localStorage.setItem('honeyai_sessions', JSON.stringify(allSessions)); }
 
         function renderHistoryList() {
             const list = document.getElementById('history-list'); 

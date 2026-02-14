@@ -20,7 +20,7 @@ export default async function handler(req, res) {
                 { role: "system", content: "あなたは役に立つアシスタントです。日本語で答えてください。" },
                 { role: "user", content: message }
             ],
-            model: "llama3-8b-8192", // または "mixtral-8x7b-32768" など
+model: "llama-3.3-70b-versatile",
         });
 
         const reply = completion.choices[0]?.message?.content || "返答がありませんでした";

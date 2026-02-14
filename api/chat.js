@@ -9,13 +9,26 @@ export default async function handler(req) {
   }
 
   try {
-    // フロントエンドから設定値を受け取る
     const { messages, systemPrompt, modelId, maxTokens } = await req.json();
     const apiKey = process.env.GROQ_API_KEY;
 
     if (!apiKey) {
       return new Response(JSON.stringify({ error: "APIキーが設定されていません" }), { status: 500 });
     }
+
+    // ★ここに「隠し性格（装飾ルール）」を定義します
+    const hiddenRules = `
+読みやすく親切な回答を心がけてください。
+
+【装飾ルール（絶対厳守）】
+重要な部分は **太字** にしてください。
+強調したい部分は <span style="color:red">赤色</span> や <span style="color:orange">オレンジ色</span> を使ってください。
+見出しが必要な場合は # を使って大きく書いてください。
+手順などは箇条書き（- ）で見やすくしてください。
+`;
+
+    // ★ユーザーの設定した性格(systemPrompt)と、隠しルール(hiddenRules)を合体！
+    const finalSystemPrompt = (systemPrompt || "") + "\n\n" + hiddenRules;
 
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -25,15 +38,14 @@ export default async function handler(req) {
       },
       body: JSON.stringify({
         messages: [
-          // システムプロンプト（ここに文字数指示も含まれて届く）
-          { role: "system", content: systemPrompt },
+          // 合体したプロンプトを送る
+          { role: "system", content: finalSystemPrompt },
           ...messages
         ],
         model: modelId || "llama-3.3-70b-versatile",
         stream: true,
         temperature: 0.6,
-        // APIのハードリミット（最大トークン数）
-        max_tokens: parseInt(maxTokens) || 4096 
+        max_tokens: parseInt(maxTokens) || 4096
       }),
     });
 

@@ -1,7 +1,10 @@
 {
   "name": "honey-ai",
   "version": "1.0.0",
+  "main": "index.html",
+  "license": "MIT",
   "dependencies": {
-    "groq-sdk": "^0.3.3"
+    "groq-sdk": "^0.3.3",
+    "node-fetch": "^3.3.2"
   }
 }

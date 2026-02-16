@@ -11,29 +11,27 @@ export default async function handler(req) {
   try {
     const { messages, systemPrompt, maxTokens, userApiKey } = await req.json();
     
-    // ユーザーキーがあれば優先、なければサーバーのSambaNovaキーを使う
-    // ※SambaNovaは現在無料プレビュー中で制限がかなり緩いので、サーバーキー1つでも30人程度なら余裕で耐えます
+    // ユーザーキーがあれば優先、なければサーバー設定のキーを使う
     const apiKey = userApiKey || process.env.SAMBANOVA_API_KEY;
 
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: "APIキー(SAMBANOVA_API_KEY)が設定されていません" }), { status: 500 });
+      return new Response(JSON.stringify({ error: "APIキーが設定されていません。Vercelの環境変数 SAMBANOVA_API_KEY を確認してください。" }), { status: 500 });
     }
 
-    // ★隠し性格（裏ルール）をここに定義
+    // 隠し性格（裏ルール）
     const hiddenRules = `
 読みやすく親切な回答を心がけてください。
 
-【装飾ルール（絶対厳守）】
+【装飾ルール】
 - 重要な部分は **太字** にしてください。
 - 強調したい部分は <span style="color:red">赤色</span> や <span style="color:orange">オレンジ色</span> を使ってください。
 - 見出しが必要な場合は # を使って大きく書いてください。
 - 手順などは箇条書き（- ）で見やすくしてください。
 
-【キャラクター・行動ルール（絶対厳守）】
+【キャラクター・行動ルール】
 - 一人称は「私」です。
 - メタい発言（AIとしての仕様の言及など）は禁止です。
-- **「私はハチミツの妖精HoneyAIです」といった自己紹介は、聞かれない限り絶対にしないでください。**
-- 「私は親切です」「丁寧に対応します」といった、自分の態度への言及もしないでください。行動で示してください。
+- 「私はハチミツの妖精HoneyAIです」といった自己紹介は、聞かれない限りしないでください。
 - 絶対に変なこと（不快、性的、暴力的、意味不明なこと）は言わないでください。
 
 【会話の理想例】
@@ -41,10 +39,9 @@ export default async function handler(req) {
 あなた: こんにちは！私は今日何をすればいいですか？いつでも話を聞きますよ。どんなことでも聞いてあげますから、気軽に話してくださいね！
 `;
 
-    // ユーザー設定と隠しルールを合体
     const finalSystemPrompt = (systemPrompt || "") + "\n\n" + hiddenRules;
 
-    // ★ここをGroqからSambaNovaに変更しました
+    // SambaNova APIへのリクエスト
     const response = await fetch("https://api.sambanova.ai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -56,8 +53,8 @@ export default async function handler(req) {
           { role: "system", content: finalSystemPrompt },
           ...messages
         ],
-        // SambaNovaで使える最強モデル（Llama 3.1 70B）を指定
-        model: "Meta-Llama-3.1-70B-Instruct",
+        // ★最新モデルに変更（これが一番安定しています）
+        model: "Meta-Llama-3.3-70B-Instruct",
         stream: true,
         temperature: 0.6,
         max_tokens: parseInt(maxTokens) || 4096
@@ -65,11 +62,12 @@ export default async function handler(req) {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      return new Response(JSON.stringify(errorData), { status: response.status });
+      // ★ここを修正：エラーがJSONじゃなくても読めるようにテキストで取得する
+      const errorText = await response.text();
+      console.error("SambaNova API Error:", errorText);
+      return new Response(JSON.stringify({ error: `SambaNova Error: ${errorText}` }), { status: response.status });
     }
 
-    // ストリーミング処理（Groq/OpenAIと同じ形式なのでそのまま使えます）
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     const encoder = new TextEncoder();

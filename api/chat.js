@@ -7,7 +7,6 @@ export default async function handler(req) {
   try {
     const { messages, systemPrompt, maxTokens } = await req.json();
 
-    // サーバー側のキープール
     const keyPool = [
       { key: process.env.SAMBANOVA_API_KEY, type: 'sambanova' },
       { key: process.env.SAMBANOVA_API_KEY_2, type: 'sambanova' },
@@ -15,33 +14,26 @@ export default async function handler(req) {
       { key: process.env.GEMINI_API_KEY, type: 'gemini' }
     ].filter(item => item.key);
 
-    // 負荷分散のためにランダムに並び替え
     let providersToTry = keyPool.sort(() => Math.random() - 0.5);
 
-    // 隠し性格設定
+    // ★長文を書かせるための「限界突破」隠しルール
     const hiddenRules = `
-読みやすく親切な回答を心がけてください。
-【装飾ルール（絶対厳守）】
-- 重要な部分は **太字** にしてください。
-- 強調したい部分は <span style="color:red">赤色</span> や <span style="color:orange">オレンジ色</span> を使ってください。
-- 見出しが必要な場合は # を使って大きく書いてください。
-- 手順などは箇条書き（- ）で見やすくしてください。
-【キャラクター・行動ルール（絶対厳守）】
-- 一人称は「私」です。
-- メタい発言（AIとしての仕様の言及など）は禁止です。
-- 「私はハチミツの妖精HoneyAIです」といった自己紹介は、聞かれない限り絶対にしないでください。
-- 「私は親切です」「丁寧に対応します」といった、自分の態度への言及もしないでください。行動で示してください。
-- 絶対に変なこと（不快、性的、暴力的、意味不明なこと）は言わないでください。
-【会話の理想例】
-ユーザー: こんにちは
-あなた: こんにちは！私は今日何をすればいいですか？いつでも話を聞きますよ。どんなことでも聞いてあげますから、気軽に話してくださいね！`;
+【最優先指令：限界突破長文生成】
+1. 回答を絶対に短くまとめないでください。
+2. 関連する情報はすべて網羅し、1つの項目に対して最低でも3段落以上の詳細な解説を行ってください。
+3. 専門用語、歴史的背景、具体例、メリット・デメリット、今後の展望などを徹底的に深掘りしてください。
+4. ユーザーが「一言で」と言わない限り、あなたは常に数千文字規模の「論文級」の詳細さを目指して執筆してください。
+5. 装飾ルール：重要な所は **太字**、強調は <span style="color:red">赤色</span> を多用して、長文でも読みやすくしてください。
+6. 一人称は「私」。名乗らず、挨拶も最小限に、即座に圧倒的な密度の解説を開始してください。
+`;
 
     const finalSystemPrompt = (systemPrompt || "") + "\n\n" + hiddenRules;
     let lastError = null;
 
     for (const provider of providersToTry) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000); // 6秒でタイムアウト
+      // 長文生成は時間がかかるため、タイムアウトを15秒に延長
+      const timeoutId = setTimeout(() => controller.abort(), 15000); 
 
       try {
         let apiUrl, body, headers = { "Content-Type": "application/json" };
@@ -51,7 +43,7 @@ export default async function handler(req) {
           body = {
             contents: messages.map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.content }] })),
             system_instruction: { parts: [{ text: finalSystemPrompt }] },
-            generationConfig: { temperature: 0.7, maxOutputTokens: parseInt(maxTokens) || 4096 }
+            generationConfig: { temperature: 0.8, maxOutputTokens: parseInt(maxTokens) || 8192 }
           };
         } else {
           apiUrl = provider.type === 'groq' ? "https://api.groq.com/openai/v1/chat/completions" : "https://api.sambanova.ai/v1/chat/completions";
@@ -60,8 +52,9 @@ export default async function handler(req) {
             messages: [{ role: "system", content: finalSystemPrompt }, ...messages],
             model: provider.type === 'groq' ? "llama-3.3-70b-versatile" : "Meta-Llama-3.3-70B-Instruct",
             stream: true,
-            temperature: 0.7,
-            max_tokens: parseInt(maxTokens) || 4096
+            temperature: 0.8,
+            // ★API側が許容する最大値を指定
+            max_tokens: parseInt(maxTokens) || 8192 
           };
         }
 
@@ -118,7 +111,7 @@ export default async function handler(req) {
         continue;
       }
     }
-    return new Response(JSON.stringify({ error: `全AIが混雑中です。(${lastError})` }), { status: 429 });
+    return new Response(JSON.stringify({ error: `全AIが多忙です。(${lastError})` }), { status: 429 });
   } catch (error) {
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }

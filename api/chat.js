@@ -7,7 +7,7 @@ export default async function handler(req) {
   try {
     const { messages, systemPrompt, maxTokens, userApiKey } = await req.json();
 
-    // 1. 全キーを収集し、プロバイダー情報を紐付け
+    // 1. 全プロバイダーのプール作成
     const keyPool = [
       { key: process.env.SAMBANOVA_API_KEY, type: 'sambanova' },
       { key: process.env.SAMBANOVA_API_KEY_2, type: 'sambanova' },
@@ -15,39 +15,41 @@ export default async function handler(req) {
       { key: process.env.GEMINI_API_KEY, type: 'gemini' }
     ].filter(item => item.key);
 
-    // 試行順序をランダム化（負荷分散）
+    // 試行順をランダム化して負荷分散（ユーザーキーがあれば最優先）
     let providersToTry = userApiKey 
       ? [{ key: userApiKey, type: userApiKey.startsWith('gsk_') ? 'groq' : 'sambanova' }] 
       : keyPool.sort(() => Math.random() - 0.5);
 
-    // 2. 隠し性格の定義
-    const hiddenRules = ` 一人称は「私」。名乗らずに会話を開始してください。メタ発言、AIである言及は禁止。重要な箇所は**太字**、強調は<span style="color:red">赤色</span>を使用してください。`;
+    // 2. 隠し性格の定義（裏ルール）
+    const hiddenRules = `
+[SYSTEM_RULE]
+- 一人称: 私
+- 装飾: 重要箇所は **太字**、強調は <span style="color:red">赤色</span>。見出しは #。
+- 禁止: 自己紹介（ハチミツの妖精HoneyAIです等の名乗り）、自身の態度への言及。
+- 口調: 自然な会話を優先し、AIらしさを隠すこと。
+`;
     const finalSystemPrompt = (systemPrompt || "") + "\n\n" + hiddenRules;
 
     let lastError = null;
 
-    // 3. プロバイダーを渡り歩くループ
+    // 3. プロバイダーを渡り歩くリトライループ
     for (const provider of providersToTry) {
+      // 1つの会社が6秒以上黙ったら見切って次へ
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+
       try {
         let apiUrl, body, headers = { "Content-Type": "application/json" };
 
         if (provider.type === 'gemini') {
-          // --- Geminiの設定 ---
           apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${provider.key}`;
           body = {
-            contents: messages.map(m => ({
-              role: m.role === 'user' ? 'user' : 'model',
-              parts: [{ text: m.content }]
-            })),
+            contents: messages.map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.content }] })),
             system_instruction: { parts: [{ text: finalSystemPrompt }] },
             generationConfig: { temperature: 0.7, maxOutputTokens: parseInt(maxTokens) || 4096 }
           };
         } else {
-          // --- OpenAI互換 (SambaNova / Groq) の設定 ---
-          apiUrl = provider.type === 'groq' 
-            ? "https://api.groq.com/openai/v1/chat/completions" 
-            : "https://api.sambanova.ai/v1/chat/completions";
-          
+          apiUrl = provider.type === 'groq' ? "https://api.groq.com/openai/v1/chat/completions" : "https://api.sambanova.ai/v1/chat/completions";
           headers["Authorization"] = `Bearer ${provider.key}`;
           body = {
             messages: [{ role: "system", content: finalSystemPrompt }, ...messages],
@@ -58,7 +60,14 @@ export default async function handler(req) {
           };
         }
 
-        const response = await fetch(apiUrl, { method: "POST", headers, body: JSON.stringify(body) });
+        const response = await fetch(apiUrl, { 
+          method: "POST", 
+          headers, 
+          body: JSON.stringify(body),
+          signal: controller.signal 
+        });
+
+        clearTimeout(timeoutId);
 
         if (response.ok) {
           const reader = response.body.getReader();
@@ -74,17 +83,17 @@ export default async function handler(req) {
                 buffer += decoder.decode(value, { stream: true });
 
                 if (provider.type === 'gemini') {
-                  // Geminiのストリーム解析 (JSONパーツからtextを抽出)
                   const matches = buffer.match(/"text":\s*"((?:[^"\\]|\\.)*)"/g);
                   if (matches) {
                     matches.forEach(m => {
-                      const t = JSON.parse(`{${m}}`).text;
-                      controller.enqueue(encoder.encode(t));
+                      try {
+                        const t = JSON.parse(`{${m}}`).text;
+                        controller.enqueue(encoder.encode(t));
+                      } catch(e){}
                     });
-                    buffer = ""; // Geminiはチャンクごとに完結しやすいのでクリア
+                    buffer = "";
                   }
                 } else {
-                  // OpenAI形式 (Groq/Samba) のストリーム解析
                   const lines = buffer.split("\n");
                   buffer = lines.pop();
                   for (const line of lines) {
@@ -100,18 +109,18 @@ export default async function handler(req) {
               }
               controller.close();
             }
-          }), { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
+          }), { headers: { "Content-Type": "text/event-stream" } });
         } else {
-          lastError = `Provider ${provider.type} failed (${response.status})`;
-          continue; // 失敗したら次の会社（プロバイダー）へ！
+          lastError = `${provider.type}: ${response.status}`;
+          continue;
         }
       } catch (e) {
-        lastError = e.message;
+        lastError = `${provider.type}: ${e.name === 'AbortError' ? 'Timeout' : e.message}`;
         continue;
       }
     }
 
-    return new Response(JSON.stringify({ error: `すべてのAIプロバイダーが制限中です。1分ほど待ってね。 詳細: ${lastError}` }), { status: 429 });
+    return new Response(JSON.stringify({ error: `全プロバイダーが応答しませんでした (${lastError})` }), { status: 429 });
 
   } catch (error) {
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });

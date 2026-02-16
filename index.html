@@ -11,16 +11,20 @@
         :root { --honey-dark: #8B4513; --honey-gold: #FFC107; --honey-light: #FFF8E1; --honey-accent: #FF9800; --sidebar-bg: #FDF5E6; --code-bg: #2d2d2d; }
         body { font-family: 'M PLUS Rounded 1c', sans-serif; background: var(--honey-light); margin: 0; display: flex; height: 100vh; color: var(--honey-dark); overflow: hidden; }
         .sidebar { width: 260px; background: var(--sidebar-bg); border-right: 2px solid #FFE082; display: flex; flex-direction: column; padding: 15px; flex-shrink: 0; transition: 0.3s; }
-        .new-chat-btn { background: var(--honey-gold); border: none; padding: 12px; border-radius: 20px; font-weight: bold; cursor: pointer; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); width: 100%; transition: 0.2s; }
+        .new-chat-btn { background: var(--honey-gold); border: none; padding: 12px; border-radius: 20px; font-weight: bold; cursor: pointer; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); width: 100%; }
         .history-list { flex-grow: 1; overflow-y: auto; }
-        .history-item { padding: 12px; margin-bottom: 8px; border-radius: 12px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.85rem; position: relative; background: rgba(255,255,255,0.5); border: 1px solid transparent; padding-right: 50px; }
-        .history-item.active { background: #FFE082; font-weight: bold; border-color: var(--honey-dark); }
-        .history-btn { position: absolute; top: 50%; transform: translateY(-50%); background: none; border: none; color: #888; cursor: pointer; display: none; font-size: 1rem; }
+        .history-item { padding: 12px; margin-bottom: 8px; border-radius: 12px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.85rem; position: relative; background: rgba(255,255,255,0.5); }
+        .history-item.active { background: #FFE082; font-weight: bold; border: 1px solid var(--honey-dark); }
+        .history-btn { position: absolute; top: 50%; transform: translateY(-50%); background: none; border: none; color: #888; cursor: pointer; display: none; }
         .history-item:hover .history-btn { display: block; }
         .delete-btn { right: 5px; color: #ff6b6b; }
         .edit-btn { right: 30px; color: #4dabf7; }
         .main-content { flex-grow: 1; display: flex; flex-direction: column; background: white; width: 100%; position: relative; }
         header { padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; color: var(--honey-accent); font-weight: bold; }
+        
+        /* RPMメーター */
+        .rpm-meter { font-size: 0.7rem; background: #FFF3E0; padding: 2px 8px; border-radius: 10px; color: #E65100; border: 1px solid #FFE0B2; }
+
         #chat-box { flex-grow: 1; padding: 20px; overflow-y: auto; background-image: radial-gradient(#FFF8E1 20%, transparent 20%); background-size: 20px 20px; }
         .message { margin-bottom: 20px; display: flex; flex-direction: column; }
         .bubble { max-width: 85%; padding: 12px 20px; border-radius: 18px; line-height: 1.6; font-size: 0.95rem; word-wrap: break-word; }
@@ -49,24 +53,38 @@
     <main class="main-content">
         <header>
             <span onclick="document.getElementById('sidebar').classList.toggle('open')" style="cursor:pointer;">☰ 🍯 HoneyAI</span>
-            <button onclick="toggleSettings()" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">⚙️</button>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <div id="rpm-display" class="rpm-meter">RPM: 0</div>
+                <button onclick="toggleSettings()" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">⚙️</button>
+            </div>
         </header>
         <div id="settings-panel">
-            <div class="setting-item"><label>👤 職業</label><input type="text" id="user-profession"></div>
-            <div class="setting-item"><label>📈 文字数上限</label><input type="range" id="max-tokens" min="1024" max="32768" step="1024" value="8192"><span id="val-max" style="font-size:0.8rem;">8192</span></div>
-            <div class="setting-item"><label>性格設定</label><textarea id="system-prompt" rows="4">あなたはハチミツの妖精です。</textarea></div>
-            <div class="setting-item"><label>🔑 予備APIキー</label><input type="password" id="user-api-key"></div>
-            <button onclick="saveSettings()" style="width:100%; background:var(--honey-gold); padding:12px; border-radius:12px; border:none; cursor:pointer; font-weight:bold;">保存</button>
+            <div class="setting-item">
+                <label>👤 あなたの職業</label>
+                <input type="text" id="user-profession" placeholder="例: 中学生、エンジニア...">
+            </div>
+            <div class="setting-item">
+                <label>📈 文字数上限</label>
+                <input type="range" id="max-tokens" min="1024" max="32768" step="1024" value="8192" oninput="document.getElementById('val-max').innerText = this.value">
+                <span id="val-max" style="font-size:0.8rem; color:orange;">8192</span>
+            </div>
+            <div class="setting-item">
+                <label>性格設定</label>
+                <textarea id="system-prompt" rows="4">優しくお話ししてください。</textarea>
+            </div>
+            <button onclick="saveSettings()" style="width:100%; background:var(--honey-gold); border:none; padding:12px; border-radius:12px; cursor:pointer; font-weight:bold;">保存</button>
         </div>
         <div id="chat-box"></div>
         <div class="input-area">
-            <input type="text" id="user-input" placeholder="メッセージ..." onkeypress="if(event.key === 'Enter') sendMessage()">
+            <input type="text" id="user-input" placeholder="メッセージを入力..." onkeypress="if(event.key === 'Enter') sendMessage()">
             <button class="send-btn" onclick="sendMessage()">➤</button>
         </div>
     </main>
     <script>
         let allSessions = {}, currentSessionId = null;
-        let appSettings = { systemPrompt: "ハチミツの妖精として話してね。", maxTokens: 8192, userProfession: "", userApiKey: "" };
+        let appSettings = { systemPrompt: "親切に話してください。", maxTokens: 8192, userProfession: "" };
+        let requestTimes = []; // RPM計算用
+
         const chatBox = document.getElementById('chat-box'), userInput = document.getElementById('user-input');
 
         window.onload = function() {
@@ -76,10 +94,19 @@
             } catch(e){}
             document.getElementById('system-prompt').value = appSettings.systemPrompt;
             document.getElementById('max-tokens').value = appSettings.maxTokens;
+            document.getElementById('val-max').innerText = appSettings.maxTokens;
             document.getElementById('user-profession').value = appSettings.userProfession;
-            document.getElementById('user-api-key').value = appSettings.userApiKey;
+            updateRPM();
             renderHistoryList(); startNewChat();
         };
+
+        // RPM（分間リクエスト数）の計算と表示
+        function updateRPM() {
+            const now = Date.now();
+            requestTimes = requestTimes.filter(t => now - t < 60000); // 過去1分間のみ保持
+            document.getElementById('rpm-display').innerText = `RPM: ${requestTimes.length}`;
+            setTimeout(updateRPM, 5000); // 5秒ごとに更新
+        }
 
         function startNewChat() {
             currentSessionId = Date.now().toString();
@@ -90,6 +117,11 @@
 
         async function sendMessage() {
             const text = userInput.value.trim(); if (!text) return;
+            
+            // RPMカウントアップ
+            requestTimes.push(Date.now());
+            document.getElementById('rpm-display').innerText = `RPM: ${requestTimes.length}`;
+
             if (allSessions[currentSessionId].messages.length === 0) { allSessions[currentSessionId].title = text.substring(0, 15); chatBox.innerHTML = ''; }
             appendMessage('user', text); allSessions[currentSessionId].messages.push({ role: "user", content: text });
             saveData(); userInput.value = '';
@@ -103,15 +135,9 @@
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ messages: allSessions[currentSessionId].messages, systemPrompt: finalPrompt, maxTokens: appSettings.maxTokens, userApiKey: appSettings.userApiKey })
+                    body: JSON.stringify({ messages: allSessions[currentSessionId].messages, systemPrompt: finalPrompt, maxTokens: appSettings.maxTokens })
                 });
-
-                if (!response.ok) {
-                    let msg = "サーバーが重いみつ... (Status: " + response.status + ")";
-                    try { const err = await response.json(); msg = err.error || msg; } catch(e){}
-                    throw new Error(msg);
-                }
-
+                if (!response.ok) { const err = await response.json(); throw new Error(err.error || '通信エラー'); }
                 const reader = response.body.getReader(), decoder = new TextDecoder();
                 while (true) {
                     const { done, value } = await reader.read(); if (done) break;
@@ -127,9 +153,12 @@
 
         function formatContent(content) {
             let text = content.replace(/<think>([\s\S]*?)<\/think>/, (m, t) => `<details open><summary>思考プロセス</summary><div style="font-style:italic; color:#8D6E63; padding:8px;">${t.replace(/\n/g, '<br>')}</div></details>`);
-            let html = marked.parse(text);
-            html = html.replace(/<pre><code/g, '<div style="position:relative"><button class="copy-btn" onclick="copyCode(this)">Copy</button><pre><code');
-            return DOMPurify.sanitize(html, { ADD_TAGS: ['u', 'span'], ADD_ATTR: ['style'] });
+            if (typeof marked !== 'undefined') {
+                let html = marked.parse(text);
+                html = html.replace(/<pre><code/g, '<div style="position:relative"><button class="copy-btn" onclick="copyCode(this)">Copy</button><pre><code');
+                return DOMPurify.sanitize(html, { ADD_TAGS: ['u', 'span'], ADD_ATTR: ['style'] });
+            }
+            return text.replace(/\n/g, '<br>');
         }
 
         function appendMessage(role, content) {
@@ -142,7 +171,7 @@
 
         async function generateAutoTitle(text, id) {
             try {
-                const res = await fetch('/api/chat', { method: 'POST', body: JSON.stringify({ messages: [{role:"user", content:`以下を15字以内で要約してタイトルのみ出力せよ:${text}`}], maxTokens: 50 }) });
+                const res = await fetch('/api/chat', { method: 'POST', body: JSON.stringify({ messages: [{role:"user", content:`以下を15字以内でタイトルにして出力せよ:${text}`}], maxTokens: 50 }) });
                 const reader = res.body.getReader(), decoder = new TextDecoder();
                 let title = "";
                 while(true) { const {done, value} = await reader.read(); if(done) break; title += decoder.decode(value); }
@@ -154,9 +183,8 @@
             appSettings.systemPrompt = document.getElementById('system-prompt').value;
             appSettings.maxTokens = document.getElementById('max-tokens').value;
             appSettings.userProfession = document.getElementById('user-profession').value;
-            appSettings.userApiKey = document.getElementById('user-api-key').value.trim();
             localStorage.setItem('honeyai_settings', JSON.stringify(appSettings));
-            alert('保存完了だみつ！'); toggleSettings();
+            alert('保存したみつ！'); toggleSettings();
         }
 
         function saveData() { localStorage.setItem('honeyai_sessions', JSON.stringify(allSessions)); }
@@ -174,7 +202,7 @@
         function renameSession(e, id) { e.stopPropagation(); const n = prompt("名前変更:", allSessions[id].title); if(n) { allSessions[id].title = n; saveData(); renderHistoryList(); } }
         function deleteSession(e, id) { e.stopPropagation(); if(confirm("消す？")) { delete allSessions[id]; saveData(); if(id === currentSessionId) startNewChat(); else renderHistoryList(); } }
         function toggleSettings() { const p = document.getElementById('settings-panel'); p.style.display = p.style.display === 'block' ? 'none' : 'block'; }
-        window.copyCode = function(btn) { navigator.clipboard.writeText(btn.nextElementSibling.innerText); btn.innerText = "Copied!"; setTimeout(()=>btn.innerText="Copy", 2000); }
+        window.copyCode = function(btn) { navigator.clipboard.writeText(btn.parentElement.nextElementSibling.innerText); btn.innerText = "Copied!"; setTimeout(()=>btn.innerText="Copy", 2000); }
     </script>
 </body>
 </html>

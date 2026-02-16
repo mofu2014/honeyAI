@@ -11,9 +11,9 @@
         :root { --honey-dark: #8B4513; --honey-gold: #FFC107; --honey-light: #FFF8E1; --honey-accent: #FF9800; --sidebar-bg: #FDF5E6; --code-bg: #2d2d2d; }
         body { font-family: 'M PLUS Rounded 1c', sans-serif; background: var(--honey-light); margin: 0; display: flex; height: 100vh; color: var(--honey-dark); overflow: hidden; }
         .sidebar { width: 260px; background: var(--sidebar-bg); border-right: 2px solid #FFE082; display: flex; flex-direction: column; padding: 15px; flex-shrink: 0; transition: 0.3s; }
-        .new-chat-btn { background: var(--honey-gold); border: none; padding: 12px; border-radius: 20px; font-weight: bold; cursor: pointer; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); width: 100%; }
+        .new-chat-btn { background: var(--honey-gold); border: none; padding: 12px; border-radius: 20px; font-weight: bold; cursor: pointer; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); width: 100%; transition: 0.2s; }
         .history-list { flex-grow: 1; overflow-y: auto; }
-        .history-item { padding: 12px; margin-bottom: 8px; border-radius: 12px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.85rem; position: relative; background: rgba(255,255,255,0.5); border: 1px solid transparent; }
+        .history-item { padding: 12px; margin-bottom: 8px; border-radius: 12px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.85rem; position: relative; background: rgba(255,255,255,0.5); border: 1px solid transparent; padding-right: 50px; }
         .history-item.active { background: #FFE082; font-weight: bold; border-color: var(--honey-dark); }
         .history-btn { position: absolute; top: 50%; transform: translateY(-50%); background: none; border: none; color: #888; cursor: pointer; display: none; font-size: 1rem; }
         .history-item:hover .history-btn { display: block; }
@@ -28,14 +28,13 @@
         .user-msg .bubble { background: var(--honey-accent); color: white; border-bottom-right-radius: 4px; }
         .ai-msg { align-items: flex-start; }
         .ai-msg .bubble { background: var(--honey-light); border: 1px solid #FFE082; border-bottom-left-radius: 4px; color: #333; width: 100%; }
-        .bubble h1, .bubble h2 { border-bottom: 2px dashed var(--honey-gold); padding-bottom: 5px; }
         .bubble strong { color: #d35400; background: rgba(255,215,0,0.2); padding: 0 4px; border-radius: 4px; }
         pre { background: var(--code-bg); color: #f8f8f2; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: monospace; position: relative; }
         .copy-btn { position: absolute; right: 5px; top: 5px; background: #666; color: white; border: none; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7rem; }
-        .input-area { padding: 15px; border-top: 1px solid #eee; display: flex; gap: 10px; background: white; }
-        #user-input { flex-grow: 1; padding: 12px 20px; border: 2px solid #ddd; border-radius: 25px; outline: none; font-size: 1rem; }
+        .input-area { padding: 15px; border-top: 1px solid #eee; display: flex; gap: 10px; }
+        #user-input { flex-grow: 1; padding: 12px 20px; border: 2px solid #ddd; border-radius: 25px; outline: none; }
         .send-btn { background: var(--honey-gold); border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; color: white; font-size: 1.2rem; }
-        #settings-panel { display: none; position: absolute; top: 60px; right: 20px; background: white; border: 3px solid var(--honey-gold); padding: 20px; border-radius: 15px; z-index: 100; width: 320px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); max-height: 80vh; overflow-y: auto; }
+        #settings-panel { display: none; position: absolute; top: 60px; right: 20px; background: white; border: 3px solid var(--honey-gold); padding: 20px; border-radius: 15px; z-index: 100; width: 300px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); max-height: 80vh; overflow-y: auto; }
         .setting-item { margin-bottom: 15px; }
         label { font-size: 0.85rem; font-weight: bold; display: block; margin-bottom: 5px; }
         select, textarea, input { width: 100%; padding: 8px; border-radius: 10px; border: 2px solid #eee; font-family: inherit; box-sizing: border-box; }
@@ -53,34 +52,21 @@
             <button onclick="toggleSettings()" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">⚙️</button>
         </header>
         <div id="settings-panel">
-            <div class="setting-item">
-                <label>👤 職業・立場</label>
-                <input type="text" id="user-profession" placeholder="例: 中学生、エンジニア...">
-            </div>
-            <div class="setting-item">
-                <label>📈 文字数目安</label>
-                <input type="range" id="max-tokens" min="1024" max="32768" step="1024" value="8192" oninput="document.getElementById('val-max').innerText = this.value">
-                <span id="val-max" style="font-size:0.8rem; color:orange;">8192</span>
-            </div>
-            <div class="setting-item">
-                <label>性格設定</label>
-                <textarea id="system-prompt" rows="4">優しく、ハチミツのようにとろけるような会話をしてください。</textarea>
-            </div>
-            <div class="setting-item" style="background:#FFF8E1; padding:10px; border-radius:10px;">
-                <label>🔑 個別APIキー (任意)</label>
-                <input type="password" id="user-api-key" placeholder="gsk_... 等">
-            </div>
-            <button onclick="saveSettings()" style="width:100%; background:var(--honey-gold); border:none; padding:12px; border-radius:12px; cursor:pointer; font-weight:bold;">保存</button>
+            <div class="setting-item"><label>👤 職業</label><input type="text" id="user-profession"></div>
+            <div class="setting-item"><label>📈 文字数上限</label><input type="range" id="max-tokens" min="1024" max="32768" step="1024" value="8192"><span id="val-max" style="font-size:0.8rem;">8192</span></div>
+            <div class="setting-item"><label>性格設定</label><textarea id="system-prompt" rows="4">あなたはハチミツの妖精です。</textarea></div>
+            <div class="setting-item"><label>🔑 予備APIキー</label><input type="password" id="user-api-key"></div>
+            <button onclick="saveSettings()" style="width:100%; background:var(--honey-gold); padding:12px; border-radius:12px; border:none; cursor:pointer; font-weight:bold;">保存</button>
         </div>
         <div id="chat-box"></div>
         <div class="input-area">
-            <input type="text" id="user-input" placeholder="メッセージを入力..." onkeypress="if(event.key === 'Enter') sendMessage()">
+            <input type="text" id="user-input" placeholder="メッセージ..." onkeypress="if(event.key === 'Enter') sendMessage()">
             <button class="send-btn" onclick="sendMessage()">➤</button>
         </div>
     </main>
     <script>
         let allSessions = {}, currentSessionId = null;
-        let appSettings = { systemPrompt: "ハチミツの妖精として親切に話してください。", maxTokens: 8192, userProfession: "", userApiKey: "" };
+        let appSettings = { systemPrompt: "ハチミツの妖精として話してね。", maxTokens: 8192, userProfession: "", userApiKey: "" };
         const chatBox = document.getElementById('chat-box'), userInput = document.getElementById('user-input');
 
         window.onload = function() {
@@ -111,7 +97,7 @@
             const bubble = appendMessage('assistant', '🍯 ...');
             let fullReply = "";
             let finalPrompt = appSettings.systemPrompt;
-            if(appSettings.userProfession) finalPrompt += `\nユーザーの職業は「${appSettings.userProfession}」です。`;
+            if(appSettings.userProfession) finalPrompt += `\nユーザーの職業: ${appSettings.userProfession}`;
 
             try {
                 const response = await fetch('/api/chat', {
@@ -119,7 +105,13 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ messages: allSessions[currentSessionId].messages, systemPrompt: finalPrompt, maxTokens: appSettings.maxTokens, userApiKey: appSettings.userApiKey })
                 });
-                if (!response.ok) { const err = await response.json(); throw new Error(err.error || 'API Error'); }
+
+                if (!response.ok) {
+                    let msg = "サーバーが重いみつ... (Status: " + response.status + ")";
+                    try { const err = await response.json(); msg = err.error || msg; } catch(e){}
+                    throw new Error(msg);
+                }
+
                 const reader = response.body.getReader(), decoder = new TextDecoder();
                 while (true) {
                     const { done, value } = await reader.read(); if (done) break;
@@ -130,7 +122,7 @@
                 allSessions[currentSessionId].messages.push({ role: "assistant", content: fullReply });
                 saveData();
                 if(allSessions[currentSessionId].messages.length === 2) generateAutoTitle(text, currentSessionId);
-            } catch (e) { bubble.innerHTML = `<span style="color:red;">${e.message}</span>`; }
+            } catch (e) { bubble.innerHTML = `<span style="color:red;">⚠️ ${e.message}</span>`; }
         }
 
         function formatContent(content) {

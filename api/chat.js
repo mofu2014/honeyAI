@@ -5,9 +5,9 @@ export default async function handler(req) {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
 
   try {
-    const { messages, systemPrompt, maxTokens, userApiKey } = await req.json();
+    const { messages, systemPrompt, maxTokens } = await req.json();
 
-    // 1. 全プロバイダーのプール作成
+    // サーバー側のキープール
     const keyPool = [
       { key: process.env.SAMBANOVA_API_KEY, type: 'sambanova' },
       { key: process.env.SAMBANOVA_API_KEY_2, type: 'sambanova' },
@@ -15,28 +15,33 @@ export default async function handler(req) {
       { key: process.env.GEMINI_API_KEY, type: 'gemini' }
     ].filter(item => item.key);
 
-    // 試行順をランダム化して負荷分散（ユーザーキーがあれば最優先）
-    let providersToTry = userApiKey 
-      ? [{ key: userApiKey, type: userApiKey.startsWith('gsk_') ? 'groq' : 'sambanova' }] 
-      : keyPool.sort(() => Math.random() - 0.5);
+    // 負荷分散のためにランダムに並び替え
+    let providersToTry = keyPool.sort(() => Math.random() - 0.5);
 
-    // 2. 隠し性格の定義（裏ルール）
+    // 隠し性格設定
     const hiddenRules = `
-[SYSTEM_RULE]
-- 一人称: 私
-- 装飾: 重要箇所は **太字**、強調は <span style="color:red">赤色</span>。見出しは #。
-- 禁止: 自己紹介（ハチミツの妖精HoneyAIです等の名乗り）、自身の態度への言及。
-- 口調: 自然な会話を優先し、AIらしさを隠すこと。
-`;
-    const finalSystemPrompt = (systemPrompt || "") + "\n\n" + hiddenRules;
+読みやすく親切な回答を心がけてください。
+【装飾ルール（絶対厳守）】
+- 重要な部分は **太字** にしてください。
+- 強調したい部分は <span style="color:red">赤色</span> や <span style="color:orange">オレンジ色</span> を使ってください。
+- 見出しが必要な場合は # を使って大きく書いてください。
+- 手順などは箇条書き（- ）で見やすくしてください。
+【キャラクター・行動ルール（絶対厳守）】
+- 一人称は「私」です。
+- メタい発言（AIとしての仕様の言及など）は禁止です。
+- 「私はハチミツの妖精HoneyAIです」といった自己紹介は、聞かれない限り絶対にしないでください。
+- 「私は親切です」「丁寧に対応します」といった、自分の態度への言及もしないでください。行動で示してください。
+- 絶対に変なこと（不快、性的、暴力的、意味不明なこと）は言わないでください。
+【会話の理想例】
+ユーザー: こんにちは
+あなた: こんにちは！私は今日何をすればいいですか？いつでも話を聞きますよ。どんなことでも聞いてあげますから、気軽に話してくださいね！`;
 
+    const finalSystemPrompt = (systemPrompt || "") + "\n\n" + hiddenRules;
     let lastError = null;
 
-    // 3. プロバイダーを渡り歩くリトライループ
     for (const provider of providersToTry) {
-      // 1つの会社が6秒以上黙ったら見切って次へ
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 6000); // 6秒でタイムアウト
 
       try {
         let apiUrl, body, headers = { "Content-Type": "application/json" };
@@ -60,13 +65,7 @@ export default async function handler(req) {
           };
         }
 
-        const response = await fetch(apiUrl, { 
-          method: "POST", 
-          headers, 
-          body: JSON.stringify(body),
-          signal: controller.signal 
-        });
-
+        const response = await fetch(apiUrl, { method: "POST", headers, body: JSON.stringify(body), signal: controller.signal });
         clearTimeout(timeoutId);
 
         if (response.ok) {
@@ -119,9 +118,7 @@ export default async function handler(req) {
         continue;
       }
     }
-
-    return new Response(JSON.stringify({ error: `全プロバイダーが応答しませんでした (${lastError})` }), { status: 429 });
-
+    return new Response(JSON.stringify({ error: `全AIが混雑中です。(${lastError})` }), { status: 429 });
   } catch (error) {
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }

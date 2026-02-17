@@ -32,31 +32,41 @@ export default async function handler(req) {
       providersToTry = allKeys;
     }
 
-    // 負荷分散のためのシャッフル
+    // シャッフルして負荷分散
     providersToTry = providersToTry.sort(() => Math.random() - 0.5);
 
-    const hiddenRules = ` 一人称「私」。名乗るの禁止。メタ発言禁止。装飾：重要は**太字**、強調は<span style="color:red">赤色</span>。語尾「〜だみつ」。`;
-    const finalSystemPrompt = (systemPrompt || "あなたはハチミツの妖精です。") + "\n\n" + hiddenRules;
+    const hiddenRules = ` 一人称「私」。名乗るの禁止。メタ発言禁止。装飾：重要は**太字**、強調は<span style="color:red">赤色</span>。`;
+    const finalSystemPrompt = (systemPrompt || "") + "\n\n" + hiddenRules;
 
     let lastError = null;
 
     for (const provider of providersToTry) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
 
       try {
         let apiUrl, body, headers = { "Content-Type": "application/json", "X-Forwarded-For": getRandomIP() };
 
         if (provider.type === 'gemini') {
-          // ★ v1betaに戻し、モデル名を最新の「gemini-1.5-flash-latest」に変更して404を回避
-          apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:streamGenerateContent?key=${provider.key}`;
+          // ★修正：モデル名を「gemini-1.5-flash」にし、URLをv1betaで固定
+          apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${provider.key}`;
           body = {
             contents: messages.map(m => ({
               role: m.role === 'user' ? 'user' : 'model',
               parts: [{ text: m.content }]
             })),
             system_instruction: { parts: [{ text: finalSystemPrompt }] },
-            generationConfig: { temperature: 0.7, maxOutputTokens: parseInt(maxTokens) || 8192 }
+            generationConfig: { 
+                temperature: 0.7, 
+                maxOutputTokens: parseInt(maxTokens) || 8192 
+            },
+            // ★追加：学校での利用でフィルターに引っかからないよう設定（ブロックなし）
+            safetySettings: [
+                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+            ]
           };
         } else {
           apiUrl = provider.type === 'groq' ? "https://api.groq.com/openai/v1/chat/completions" : "https://api.sambanova.ai/v1/chat/completions";
@@ -114,7 +124,7 @@ export default async function handler(req) {
               }
               controller.close();
             }
-          }), { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
+          }), { headers: { "Content-Type": "text/event-stream" } });
         } else {
           const errRaw = await response.text();
           lastError = `${provider.name} (${response.status}): ${errRaw}`;

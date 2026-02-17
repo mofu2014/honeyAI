@@ -11,32 +11,23 @@ export default async function handler(req) {
   try {
     const { messages, systemPrompt, maxTokens, selectedMode } = await req.json();
 
-    // 1. キーを集める（Geminiを優先的に並べる）
-    let geminiKeys = [];
-    if (process.env.GEMINI_API_KEY) geminiKeys.push({ key: process.env.GEMINI_API_KEY, type: 'gemini', name: 'Gemini Main' });
-    for (let i = 1; i <= 50; i++) {
-        const k = process.env[`GEMINI_KEY_${i}`];
-        if (k) geminiKeys.push({ key: k, type: 'gemini', name: `Gemini ${i}` });
-    }
+    // 全てのキーを根こそぎ集める
+    let geminiPool = [];
+    Object.keys(process.env).forEach(key => {
+      if (key.includes("GEMINI") && process.env[key]) {
+        geminiPool.push({ key: process.env[key], type: 'gemini', name: key });
+      }
+    });
 
-    let llamaKeys = [
+    let llamaPool = [
       { key: process.env.SAMBANOVA_API_KEY, type: 'sambanova', name: 'SambaNova 1' },
       { key: process.env.SAMBANOVA_API_KEY_2, type: 'sambanova', name: 'SambaNova 2' },
       { key: process.env.GROQ_API_KEY, type: 'groq', name: 'Groq Llama' }
     ].filter(k => k.key);
 
-    // モード設定
-    let providersToTry = [];
-    if (selectedMode === 'gemini') {
-        providersToTry = geminiKeys;
-    } else if (selectedMode === 'llama') {
-        providersToTry = llamaKeys;
-    } else {
-        // 自動モード：Geminiを最初に全部試し、ダメならLlamaに行く「Gemini第一主義」
-        providersToTry = [...geminiKeys.sort(() => Math.random() - 0.5), ...llamaKeys.sort(() => Math.random() - 0.5)];
-    }
+    let providersToTry = (selectedMode === 'llama') ? llamaPool : [...geminiPool.sort(() => Math.random() - 0.5), ...llamaPool];
 
-    const hiddenRules = ` 一人称は「私」。名乗らず会話を開始せよ。メタ発言禁止。装飾：重要は**太字**、強調は<span style="color:red">赤色</span>。語尾「〜だみつ」。`;
+    const hiddenRules = ` 一人称「私」。名乗るの禁止。メタ発言禁止。装飾：重要は**太字**、強調は<span style="color:red">赤色</span>。`;
     const finalSystemPrompt = (systemPrompt || "") + "\n\n" + hiddenRules;
 
     let lastError = null;
@@ -49,21 +40,17 @@ export default async function handler(req) {
         let apiUrl, body, headers = { "Content-Type": "application/json", "X-Forwarded-For": getRandomIP() };
 
         if (provider.type === 'gemini') {
-          // ★ 404対策：URLを Google公式SDKが内部で使っている「最も安全なv1betaパス」に完全固定
+          // ★ 404を絶対に出さないための「最も標準的なURL」に固定したみつ
           apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${provider.key}`;
           body = {
-            contents: messages.map(m => ({
-              role: m.role === 'user' ? 'user' : 'model',
-              parts: [{ text: m.content }]
-            })),
+            contents: messages.map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.content }] })),
             system_instruction: { parts: [{ text: finalSystemPrompt }] },
             generationConfig: { temperature: 0.7, maxOutputTokens: parseInt(maxTokens) || 8192 }
           };
         } else {
           apiUrl = provider.type === 'groq' ? "https://api.groq.com/openai/v1/chat/completions" : "https://api.sambanova.ai/v1/chat/completions";
           headers["Authorization"] = `Bearer ${provider.key}`;
-          const modelName = provider.type === 'groq' ? "llama-3.3-70b-versatile" : "Meta-Llama-3.3-70B-Instruct";
-          body = { messages: [{ role: "system", content: finalSystemPrompt }, ...messages], model: modelName, stream: true, temperature: 0.7, max_tokens: parseInt(maxTokens) || 4096 };
+          body = { messages: [{ role: "system", content: finalSystemPrompt }, ...messages], model: provider.type === 'groq' ? "llama-3.3-70b-versatile" : "Meta-Llama-3.3-70B-Instruct", stream: true, temperature: 0.7, max_tokens: parseInt(maxTokens) || 4096 };
         }
 
         const response = await fetch(apiUrl, { method: "POST", headers, body: JSON.stringify(body), signal: controller.signal });
@@ -72,7 +59,6 @@ export default async function handler(req) {
         if (response.ok) {
           const reader = response.body.getReader();
           const decoder = new TextDecoder();
-
           return new Response(new ReadableStream({
             async start(controller) {
               controller.enqueue(new TextEncoder().encode(`[:model:${provider.name}:]`));
@@ -81,19 +67,10 @@ export default async function handler(req) {
                 const { done, value } = await reader.read();
                 if (done) break;
                 buffer += decoder.decode(value, { stream: true });
-                
                 if (provider.type === 'gemini') {
-                  // ★ Geminiのストリーム解析を正規表現から「より確実な方法」へ
-                  const parts = buffer.split('}\r\n{'); // Geminiの区切り文字
-                  // ストリーム処理を安定させるため、簡易的にtextを探す
                   const matches = buffer.match(/"text":\s*"((?:[^"\\]|\\.)*)"/g);
                   if (matches) {
-                    matches.forEach(m => {
-                      try {
-                        const t = JSON.parse(`{${m}}`).text;
-                        controller.enqueue(new TextEncoder().encode(t));
-                      } catch(e){}
-                    });
+                    matches.forEach(m => { try { const t = JSON.parse(`{${m}}`).text; controller.enqueue(new TextEncoder().encode(t)); } catch(e){} });
                     buffer = ""; 
                   }
                 } else {
@@ -101,10 +78,7 @@ export default async function handler(req) {
                   buffer = lines.pop();
                   for (const line of lines) {
                     if (line.startsWith("data: ") && line !== "data: [DONE]") {
-                      try {
-                        const content = JSON.parse(line.substring(6)).choices[0]?.delta?.content || "";
-                        if (content) controller.enqueue(new TextEncoder().encode(content));
-                      } catch (e) {}
+                      try { const content = JSON.parse(line.substring(6)).choices[0]?.delta?.content || ""; if (content) controller.enqueue(new TextEncoder().encode(content)); } catch (e) {}
                     }
                   }
                 }
@@ -113,18 +87,15 @@ export default async function handler(req) {
             }
           }), { headers: { "Content-Type": "text/event-stream" } });
         } else {
-          const errStatus = response.status;
-          const errText = await response.text();
-          lastError = `${provider.name} (${errStatus}): ${errText.substring(0, 50)}`;
-          console.warn(`Retry: ${lastError}`);
+          lastError = `${provider.name} (${response.status})`;
           continue; 
         }
       } catch (e) {
-        lastError = `${provider.name} Error: ${e.message}`;
+        lastError = e.message;
         continue;
       }
     }
-    return new Response(JSON.stringify({ error: `全AIが応答不能だみつ。最後のエラー: ${lastError}` }), { status: 429 });
+    return new Response(JSON.stringify({ error: `全AI回線エラー。最後のエラー: ${lastError}` }), { status: 429 });
   } catch (error) {
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }

@@ -11,7 +11,7 @@ export default async function handler(req) {
   try {
     const { messages, systemPrompt, maxTokens, selectedMode } = await req.json();
 
-    // 1. 環境変数のキーをすべて収集
+    // 1. 環境変数のキーをすべて収集（GEMINIという文字が入っていれば全部拾う）
     let geminiPool = [];
     Object.keys(process.env).forEach(key => {
       if (key.includes("GEMINI") && process.env[key]) {
@@ -25,41 +25,48 @@ export default async function handler(req) {
       { key: process.env.GROQ_API_KEY, name: 'Groq Llama', type: 'groq' }
     ].filter(k => k.key);
 
-    let providersToTry = (selectedMode === 'gemini') ? geminiPool : 
-                         (selectedMode === 'llama') ? llamaPool : 
-                         [...geminiPool.sort(() => Math.random() - 0.5), ...llamaPool];
+    // 実行順序の決定
+    let providersToTry = [];
+    if (selectedMode === 'gemini') {
+        providersToTry = geminiPool.sort(() => Math.random() - 0.5);
+    } else if (selectedMode === 'llama') {
+        providersToTry = llamaPool.sort(() => Math.random() - 0.5);
+    } else {
+        // 自動モード：Gemini 17個を最優先で並べ、その後にLlamaを置く
+        providersToTry = [...geminiPool.sort(() => Math.random() - 0.5), ...llamaPool];
+    }
 
-    const hiddenRules = ` 一人称「私」。名乗らない。メタ発言禁止。装飾：重要は**太字**、強調は<span style="color:red">赤色</span>。語尾「〜だみつ」。`;
-    const finalSystemPrompt = (systemPrompt || "優しく親切に話してください。") + "\n\n" + hiddenRules;
+    const hiddenRules = ` 一人称は「私」。名乗らない。装飾：重要は**太字**、強調は<span style="color:red">赤色</span>。語尾「〜だみつ」。`;
+    const finalSystemPrompt = (systemPrompt || "親切に話してください。") + "\n\n" + hiddenRules;
 
     let debugLogs = [];
 
+    // 2. 執念のリトライループ
     for (const provider of providersToTry) {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000); // 6秒で次へ（高速化）
+
         let apiUrl, body, headers = { "Content-Type": "application/json", "X-Forwarded-For": getRandomIP() };
 
         if (provider.type === 'gemini') {
-          // ★ 404対策のキモ：URLから /models/ を抜き、モデル名を gemini-1.5-flash に固定
-          // エンドポイントを v1beta に、アクションを streamGenerateContent に設定
+          // ★404対策：URLを最も互換性の高い「v1beta」の直撃モードに変更
           apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${provider.key}`;
           
           body = {
-            contents: messages.map(m => ({
-              role: m.role === 'user' ? 'user' : 'model',
-              parts: [{ text: m.content }]
-            })),
-            // system_instruction は contents よりも前に配置する
-            system_instruction: { parts: [{ text: finalSystemPrompt }] },
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: parseInt(maxTokens) || 8192
-            }
+            contents: [
+              // system_instructionが使えないプロジェクト対策として、最初の発言に命令を埋め込む「プロ仕様」の書き方
+              { role: "user", parts: [{ text: `これからのルール: ${finalSystemPrompt}` }] },
+              { role: "model", parts: [{ text: "了解しましただみつ！" }] },
+              ...messages.map(m => ({
+                role: m.role === 'user' ? 'user' : 'model',
+                parts: [{ text: m.content }]
+              }))
+            ],
+            generationConfig: { temperature: 0.7, maxOutputTokens: parseInt(maxTokens) || 8192 }
           };
         } else {
-          // OpenAI互換 (SambaNova / Groq)
+          // Llama (SambaNova / Groq)
           apiUrl = provider.type === 'groq' ? "https://api.groq.com/openai/v1/chat/completions" : "https://api.sambanova.ai/v1/chat/completions";
           headers["Authorization"] = `Bearer ${provider.key}`;
           const modelName = provider.type === 'groq' ? "llama-3.3-70b-versatile" : "Meta-Llama-3.3-70B-Instruct";
@@ -91,10 +98,7 @@ export default async function handler(req) {
                   const matches = buffer.match(/"text":\s*"((?:[^"\\]|\\.)*)"/g);
                   if (matches) {
                     matches.forEach(m => {
-                      try {
-                        const t = JSON.parse(`{${m}}`).text;
-                        controller.enqueue(new TextEncoder().encode(t));
-                      } catch(e){}
+                      try { const t = JSON.parse(`{${m}}`).text; controller.enqueue(new TextEncoder().encode(t)); } catch(e){}
                     });
                     buffer = "";
                   }
@@ -115,14 +119,19 @@ export default async function handler(req) {
             }
           }), { headers: { "Content-Type": "text/event-stream" } });
         } else {
-          const errBody = await response.text();
-          debugLogs.push(`${provider.name}: ${response.status} - ${errBody}`);
+          // エラーが出たら即座に次のキーへ（ユーザーには内緒でリトライ）
+          const errText = await response.text();
+          debugLogs.push(`${provider.name}: ${response.status}`);
+          console.warn(`Key ${provider.name} failed with ${response.status}`);
+          continue; 
         }
       } catch (e) {
         debugLogs.push(`${provider.name}: ${e.message}`);
+        continue;
       }
     }
-    return new Response(JSON.stringify({ error: "全AI回線でエラーだみつ。", details: debugLogs }), { status: 429 });
+    // 本当に全部（20個以上）がダメだった時だけエラーを出す
+    return new Response(JSON.stringify({ error: "全回線でエラーだみつ。時間を置いてね。", details: debugLogs }), { status: 429 });
   } catch (error) {
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }

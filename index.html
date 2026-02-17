@@ -2,48 +2,102 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>AI HTML Generator (17 Keys Ver.)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI HTML Designer (17-Key Turbo)</title>
     <style>
-        body { font-family: sans-serif; margin: 20px; }
-        textarea { width: 100%; height: 100px; margin-bottom: 10px; }
-        iframe { width: 100%; height: 500px; border: 1px solid #ccc; margin-top: 20px; }
+        :root { --primary: #4f46e5; --bg: #f8fafc; }
+        body { font-family: -apple-system, sans-serif; margin: 0; padding: 20px; background: var(--bg); color: #1e293b; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        h1 { font-size: 1.5rem; color: var(--primary); margin-bottom: 10px; }
+        
+        /* 入力エリア */
+        .controls { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); margin-bottom: 20px; }
+        textarea { width: 100%; height: 80px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 16px; resize: vertical; box-sizing: border-box; margin-bottom: 10px; }
+        button { background: var(--primary); color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: opacity 0.2s; width: 100%; }
+        button:hover { opacity: 0.9; }
+        button:disabled { background: #94a3b8; cursor: not-allowed; }
+
+        /* ステータス表示 */
+        #status { font-size: 0.9rem; margin: 10px 0; padding: 10px; border-radius: 6px; display: none; }
+        .info { background: #e0f2fe; color: #0369a1; display: block !important; }
+        .error { background: #fee2e2; color: #b91c1c; display: block !important; }
+
+        /* プレビューエリア */
+        .preview-header { margin-top: 20px; font-weight: bold; font-size: 0.9rem; color: #64748b; }
+        #preview-container { background: white; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-top: 10px; height: 600px; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1); }
+        iframe { width: 100%; height: 100%; border: none; background: white; }
     </style>
 </head>
 <body>
-    <h1>AI HTML制作（17連装Gemini）</h1>
-    <textarea id="prompt" placeholder="どんなウェブサイトを作りたいですか？"></textarea>
-    <button onclick="generate()">HTMLを生成</button>
 
-    <div id="status"></div>
-    <iframe id="preview"></iframe>
+<div class="container">
+    <h1>AI HTML Designer <span style="font-size: 0.8rem; font-weight: normal; color: #94a3b8;">(17 Keys Rotation)</span></h1>
+    
+    <div class="controls">
+        <textarea id="prompt" placeholder="例：お洒落なカフェの紹介サイトを作って。背景はベージュで、メニュー表を付けて。"></textarea>
+        <button id="genBtn" onclick="generate()">HTMLを生成する</button>
+        <div id="status"></div>
+    </div>
 
-    <script>
-        async function generate() {
-            const prompt = document.getElementById('prompt').value;
-            const status = document.getElementById('status');
-            const preview = document.getElementById('preview');
+    <div class="preview-header">生成されたプレビュー:</div>
+    <div id="preview-container">
+        <iframe id="preview"></iframe>
+    </div>
+</div>
 
-            status.innerText = "生成中... (17個のキーのどれかを使用中)";
-            
-            try {
-                const res = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt })
-                });
-                const data = await res.json();
-                
-                // iframeの中に生成されたHTMLを書き込む
-                const doc = preview.contentWindow.document;
-                doc.open();
-                doc.write(data.html);
-                doc.close();
-                
-                status.innerText = "完了！";
-            } catch (e) {
-                status.innerText = "エラーが起きました。";
-            }
+<script>
+    async function generate() {
+        const promptInput = document.getElementById('prompt');
+        const btn = document.getElementById('genBtn');
+        const status = document.getElementById('status');
+        const preview = document.getElementById('preview');
+
+        if (!promptInput.value.trim()) {
+            alert("作りたい内容を入力してください");
+            return;
         }
-    </script>
+
+        // UIを「生成中」の状態にする
+        btn.disabled = true;
+        status.className = "info";
+        status.innerText = "17個のAPIキーのいずれかを使用して生成中... (最大10〜15秒)";
+        
+        try {
+            const res = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: promptInput.value })
+            });
+
+            const data = await res.json();
+
+            if (!res.ok || data.error) {
+                throw new Error(data.error || "サーバーエラーが発生しました");
+            }
+
+            // --- Geminiが付ける余計な「```html」や「```」を削除する処理 ---
+            let cleanHtml = data.html.trim();
+            cleanHtml = cleanHtml.replace(/^```html\n?/, ""); // 先頭の ```html を削除
+            cleanHtml = cleanHtml.replace(/```$/, "");      // 末尾の ``` を削除
+
+            // iframeにHTMLを書き込む
+            const doc = preview.contentWindow.document;
+            doc.open();
+            doc.write(cleanHtml);
+            doc.close();
+            
+            status.className = "info";
+            status.innerText = "生成完了！";
+
+        } catch (e) {
+            console.error(e);
+            status.className = "error";
+            status.innerText = "エラー: " + e.message;
+        } finally {
+            btn.disabled = false;
+        }
+    }
+</script>
+
 </body>
 </html>

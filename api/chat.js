@@ -13,15 +13,15 @@ export default async function handler(req) {
 
     // 1. 全キーを収集
     let allKeys = [
-      { key: process.env.GEMINI_API_KEY, type: 'gemini', name: 'Google Gemini' },
-      { key: process.env.SAMBANOVA_API_KEY, type: 'sambanova', name: 'SambaNova Llama' },
-      { key: process.env.SAMBANOVA_API_KEY_2, type: 'sambanova', name: 'SambaNova Llama' },
+      { key: process.env.GEMINI_API_KEY, type: 'gemini', name: 'Gemini Main' },
+      { key: process.env.SAMBANOVA_API_KEY, type: 'sambanova', name: 'SambaNova 1' },
+      { key: process.env.SAMBANOVA_API_KEY_2, type: 'sambanova', name: 'SambaNova 2' },
       { key: process.env.GROQ_API_KEY, type: 'groq', name: 'Groq Llama' }
     ].filter(item => item.key);
 
     for (let i = 1; i <= 50; i++) {
         const k = process.env[`GEMINI_KEY_${i}`];
-        if (k) allKeys.push({ key: k, type: 'gemini', name: `Google Gemini (${i})` });
+        if (k) allKeys.push({ key: k, type: 'gemini', name: `Gemini ${i}` });
     }
 
     // --- 2. モードによるフィルタリング ---
@@ -34,26 +34,24 @@ export default async function handler(req) {
       providersToTry = allKeys; // 自動（シャッフル）
     }
 
-    // シャッフルして負荷分散
+    // シャッフルして特定のキーへの集中を防ぐ
     providersToTry = providersToTry.sort(() => Math.random() - 0.5);
 
-    if (providersToTry.length === 0) {
-        return new Response(JSON.stringify({ error: `選択されたモード (${selectedMode}) のキーがありません` }), { status: 500 });
-    }
-
-    const hiddenRules = `一人称「私」。名乗るの禁止。装飾：重要は**太字**、強調は<span style="color:red">赤色</span>。`;
+    const hiddenRules = ` 一人称「私」。名乗るの禁止。メタ発言禁止。装飾：重要は**太字**、強調は<span style="color:red">赤色</span>。語尾「〜だみつ」。`;
     const finalSystemPrompt = (systemPrompt || "") + "\n\n" + hiddenRules;
 
     let lastError = null;
 
+    // --- 3. プロバイダーを渡り歩くループ ---
     for (const provider of providersToTry) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒待機
 
       try {
         let apiUrl, body, headers = { "Content-Type": "application/json", "X-Forwarded-For": getRandomIP() };
 
         if (provider.type === 'gemini') {
+          // Gemini 404対策：モデル名を「gemini-1.5-flash」に固定し、URLを最新版に修正
           apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${provider.key}`;
           body = {
             contents: messages.map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.content }] })),
@@ -102,17 +100,21 @@ export default async function handler(req) {
               }
               controller.close();
             }
-          }), { headers: { "Content-Type": "text/event-stream" } });
+          }), { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
         } else {
-          lastError = `${provider.type}: ${response.status}`;
-          continue;
+          // 404や429が出た場合、このキーは飛ばして即座に次へ行く
+          const errText = await response.text();
+          lastError = `${provider.type} (${response.status}): ${errText.substring(0, 50)}`;
+          console.warn(`Retry Triggered: ${lastError}`);
+          continue; 
         }
       } catch (e) {
         lastError = e.message;
         continue;
       }
     }
-    return new Response(JSON.stringify({ error: `エラー (${lastError})` }), { status: 429 });
+    // 全キー失敗時
+    return new Response(JSON.stringify({ error: `全AIが多忙、または設定ミスです。(${lastError})` }), { status: 429 });
   } catch (error) {
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }

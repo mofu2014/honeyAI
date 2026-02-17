@@ -9,24 +9,37 @@ export default async function handler(req) {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
 
   try {
-    const { messages, systemPrompt, maxTokens, userApiKey } = await req.json();
+    const { messages, systemPrompt, maxTokens, selectedMode } = await req.json();
 
-    const keyPool = [
+    // 1. 全キーを収集
+    let allKeys = [
       { key: process.env.GEMINI_API_KEY, type: 'gemini', name: 'Google Gemini' },
       { key: process.env.SAMBANOVA_API_KEY, type: 'sambanova', name: 'SambaNova Llama' },
       { key: process.env.SAMBANOVA_API_KEY_2, type: 'sambanova', name: 'SambaNova Llama' },
       { key: process.env.GROQ_API_KEY, type: 'groq', name: 'Groq Llama' }
     ].filter(item => item.key);
 
-    // Gemini連番キーの収集
     for (let i = 1; i <= 50; i++) {
         const k = process.env[`GEMINI_KEY_${i}`];
-        if (k) keyPool.push({ key: k, type: 'gemini', name: `Google Gemini (${i})` });
+        if (k) allKeys.push({ key: k, type: 'gemini', name: `Google Gemini (${i})` });
     }
 
-    let providersToTry = userApiKey 
-      ? [{ key: userApiKey, type: userApiKey.startsWith('AIza') ? 'gemini' : (userApiKey.startsWith('gsk_') ? 'groq' : 'sambanova'), name: 'User API Key' }] 
-      : keyPool.sort(() => Math.random() - 0.5);
+    // --- 2. モードによるフィルタリング ---
+    let providersToTry = [];
+    if (selectedMode === 'gemini') {
+      providersToTry = allKeys.filter(k => k.type === 'gemini');
+    } else if (selectedMode === 'llama') {
+      providersToTry = allKeys.filter(k => k.type === 'sambanova' || k.type === 'groq');
+    } else {
+      providersToTry = allKeys; // 自動（シャッフル）
+    }
+
+    // シャッフルして負荷分散
+    providersToTry = providersToTry.sort(() => Math.random() - 0.5);
+
+    if (providersToTry.length === 0) {
+        return new Response(JSON.stringify({ error: `選択されたモード (${selectedMode}) のキーがありません` }), { status: 500 });
+    }
 
     const hiddenRules = `一人称「私」。名乗るの禁止。装飾：重要は**太字**、強調は<span style="color:red">赤色</span>。`;
     const finalSystemPrompt = (systemPrompt || "") + "\n\n" + hiddenRules;
@@ -64,9 +77,7 @@ export default async function handler(req) {
 
           return new Response(new ReadableStream({
             async start(controller) {
-              // ★ ストリームの最初に「どのAIか」をタグで送る
               controller.enqueue(encoder.encode(`[:model:${provider.name}:]`));
-
               let buffer = "";
               while (true) {
                 const { done, value } = await reader.read();
@@ -101,7 +112,7 @@ export default async function handler(req) {
         continue;
       }
     }
-    return new Response(JSON.stringify({ error: `混雑中 (${lastError})` }), { status: 429 });
+    return new Response(JSON.stringify({ error: `エラー (${lastError})` }), { status: 429 });
   } catch (error) {
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }

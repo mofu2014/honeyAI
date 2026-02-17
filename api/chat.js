@@ -11,7 +11,7 @@ export default async function handler(req) {
   try {
     const { messages, systemPrompt, maxTokens, selectedMode } = await req.json();
 
-    // 全てのキーを根こそぎ集める
+    // 1. 全てのキーを収集
     let geminiPool = [];
     Object.keys(process.env).forEach(key => {
       if (key.includes("GEMINI") && process.env[key]) {
@@ -25,13 +25,27 @@ export default async function handler(req) {
       { key: process.env.GROQ_API_KEY, type: 'groq', name: 'Groq Llama' }
     ].filter(k => k.key);
 
-    let providersToTry = (selectedMode === 'llama') ? llamaPool : [...geminiPool.sort(() => Math.random() - 0.5), ...llamaPool];
+    // --- 2. 厳格なモード分け（fallbackさせない） ---
+    let providersToTry = [];
+    if (selectedMode === 'gemini') {
+        // GeminiモードならGeminiしか入れない！
+        providersToTry = geminiPool.sort(() => Math.random() - 0.5);
+    } else if (selectedMode === 'llama') {
+        // LlamaモードならLlamaしか入れない！
+        providersToTry = llamaPool.sort(() => Math.random() - 0.5);
+    } else {
+        // 自動モードならGemini優先で混ぜる
+        providersToTry = [...geminiPool.sort(() => Math.random() - 0.5), ...llamaPool.sort(() => Math.random() - 0.5)];
+    }
 
-    const hiddenRules = ` 一人称「私」。名乗るの禁止。メタ発言禁止。装飾：重要は**太字**、強調は<span style="color:red">赤色</span>。`;
+    if (providersToTry.length === 0) return new Response(JSON.stringify({ error: "APIキーが見つかりません" }), { status: 500 });
+
+    const hiddenRules = ` 一人称「私」。名乗らない。装飾：重要は**太字**、強調は<span style="color:red">赤色</span>。`;
     const finalSystemPrompt = (systemPrompt || "") + "\n\n" + hiddenRules;
 
     let lastError = null;
 
+    // --- 3. リトライループ ---
     for (const provider of providersToTry) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); 
@@ -40,7 +54,7 @@ export default async function handler(req) {
         let apiUrl, body, headers = { "Content-Type": "application/json", "X-Forwarded-For": getRandomIP() };
 
         if (provider.type === 'gemini') {
-          // ★ 404を絶対に出さないための「最も標準的なURL」に固定したみつ
+          // Google公式ドキュメントに準拠したURL形式
           apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${provider.key}`;
           body = {
             contents: messages.map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.content }] })),
@@ -50,7 +64,8 @@ export default async function handler(req) {
         } else {
           apiUrl = provider.type === 'groq' ? "https://api.groq.com/openai/v1/chat/completions" : "https://api.sambanova.ai/v1/chat/completions";
           headers["Authorization"] = `Bearer ${provider.key}`;
-          body = { messages: [{ role: "system", content: finalSystemPrompt }, ...messages], model: provider.type === 'groq' ? "llama-3.3-70b-versatile" : "Meta-Llama-3.3-70B-Instruct", stream: true, temperature: 0.7, max_tokens: parseInt(maxTokens) || 4096 };
+          const modelName = provider.type === 'groq' ? "llama-3.3-70b-versatile" : "Meta-Llama-3.3-70B-Instruct";
+          body = { messages: [{ role: "system", content: finalSystemPrompt }, ...messages], model: modelName, stream: true, temperature: 0.7, max_tokens: parseInt(maxTokens) || 4096 };
         }
 
         const response = await fetch(apiUrl, { method: "POST", headers, body: JSON.stringify(body), signal: controller.signal });
@@ -68,9 +83,12 @@ export default async function handler(req) {
                 if (done) break;
                 buffer += decoder.decode(value, { stream: true });
                 if (provider.type === 'gemini') {
+                  // Geminiのストリームは [{...}] の形式。textを正規表現で抜き出す
                   const matches = buffer.match(/"text":\s*"((?:[^"\\]|\\.)*)"/g);
                   if (matches) {
-                    matches.forEach(m => { try { const t = JSON.parse(`{${m}}`).text; controller.enqueue(new TextEncoder().encode(t)); } catch(e){} });
+                    matches.forEach(m => {
+                      try { const t = JSON.parse(`{${m}}`).text; controller.enqueue(new TextEncoder().encode(t)); } catch(e){}
+                    });
                     buffer = ""; 
                   }
                 } else {
@@ -87,15 +105,18 @@ export default async function handler(req) {
             }
           }), { headers: { "Content-Type": "text/event-stream" } });
         } else {
-          lastError = `${provider.name} (${response.status})`;
+          // エラー内容を保持
+          const rawErr = await response.text();
+          lastError = `${provider.name} (${response.status}): ${rawErr}`;
           continue; 
         }
       } catch (e) {
-        lastError = e.message;
+        lastError = `${provider.name} Exception: ${e.message}`;
         continue;
       }
     }
-    return new Response(JSON.stringify({ error: `全AI回線エラー。最後のエラー: ${lastError}` }), { status: 429 });
+    // 全滅したら最後のエラーをハッキリ出す
+    return new Response(JSON.stringify({ error: `選択されたAI回線が全滅したみつ。原因: ${lastError}` }), { status: 429 });
   } catch (error) {
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }

@@ -1,7 +1,6 @@
 // api/chat.js
 export const config = { runtime: "edge" };
 
-// IP制限回避用のランダムIP生成
 function getRandomIP() {
   return `${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
 }
@@ -12,50 +11,31 @@ export default async function handler(req) {
   try {
     const { messages, systemPrompt, maxTokens, userApiKey } = await req.json();
 
-    // --- 1. APIキープールの構築 ---
-    let keyPool = [];
+    const keyPool = [
+      { key: process.env.GEMINI_API_KEY, type: 'gemini', name: 'Google Gemini' },
+      { key: process.env.SAMBANOVA_API_KEY, type: 'sambanova', name: 'SambaNova Llama' },
+      { key: process.env.SAMBANOVA_API_KEY_2, type: 'sambanova', name: 'SambaNova Llama' },
+      { key: process.env.GROQ_API_KEY, type: 'groq', name: 'Groq Llama' }
+    ].filter(item => item.key);
 
-    // GeminiキーをGEMINI_KEY_1～50まで自動収集
-    if (process.env.GEMINI_API_KEY) keyPool.push({ key: process.env.GEMINI_API_KEY, type: 'gemini' });
+    // Gemini連番キーの収集
     for (let i = 1; i <= 50; i++) {
         const k = process.env[`GEMINI_KEY_${i}`];
-        if (k) keyPool.push({ key: k, type: 'gemini' });
+        if (k) keyPool.push({ key: k, type: 'gemini', name: `Google Gemini (${i})` });
     }
 
-    // Groq / SambaNova キーの追加
-    const backups = [
-      { key: process.env.SAMBANOVA_API_KEY, type: 'sambanova' },
-      { key: process.env.SAMBANOVA_API_KEY_2, type: 'sambanova' },
-      { key: process.env.GROQ_API_KEY, type: 'groq' }
-    ].filter(item => item.key);
-    keyPool = [...keyPool, ...backups];
-
-    // 試行順をランダム化（負荷分散）
     let providersToTry = userApiKey 
-      ? [{ key: userApiKey, type: userApiKey.startsWith('AIza') ? 'gemini' : (userApiKey.startsWith('gsk_') ? 'groq' : 'sambanova') }] 
+      ? [{ key: userApiKey, type: userApiKey.startsWith('AIza') ? 'gemini' : (userApiKey.startsWith('gsk_') ? 'groq' : 'sambanova'), name: 'User API Key' }] 
       : keyPool.sort(() => Math.random() - 0.5);
 
-    if (providersToTry.length === 0) return new Response(JSON.stringify({ error: "APIキーが設定されていません" }), { status: 500 });
-
-    // --- 2. 隠し性格の強制注入 ---
-    const hiddenRules = `
-[SYSTEM: STRICT RULES]
-- 一人称は「私」です。
-- 語尾に「〜だみつ」「〜ハニー」をつけてください。
-- 重要な箇所は **太字**、強調は <span style="color:red">赤色</span> を使用。
-- 自己紹介（ハチミツの妖精です、等）は一切禁止。名乗らず会話を開始してください。
-- 自分の態度（親切、丁寧等）への言及も禁止。
-- メタ発言（AIとしての仕様、モデル名など）は厳禁。
-- 理想: 「こんにちは！今日は何かお手伝いできることはありますか？」
-`;
+    const hiddenRules = `一人称「私」。名乗るの禁止。装飾：重要は**太字**、強調は<span style="color:red">赤色</span>。`;
     const finalSystemPrompt = (systemPrompt || "") + "\n\n" + hiddenRules;
 
     let lastError = null;
 
-    // --- 3. 不屈のリトライループ ---
     for (const provider of providersToTry) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8秒で次へ
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
 
       try {
         let apiUrl, body, headers = { "Content-Type": "application/json", "X-Forwarded-For": getRandomIP() };
@@ -70,11 +50,8 @@ export default async function handler(req) {
         } else {
           apiUrl = provider.type === 'groq' ? "https://api.groq.com/openai/v1/chat/completions" : "https://api.sambanova.ai/v1/chat/completions";
           headers["Authorization"] = `Bearer ${provider.key}`;
-          const modelName = provider.type === 'groq' ? "llama-3.3-70b-versatile" : "Meta-Llama-3.1-8B-Instruct";
-          body = {
-            messages: [{ role: "system", content: finalSystemPrompt }, ...messages],
-            model: modelName, stream: true, temperature: 0.7, max_tokens: parseInt(maxTokens) || 4096
-          };
+          const modelName = provider.type === 'groq' ? "llama-3.3-70b-versatile" : "Meta-Llama-3.3-70B-Instruct";
+          body = { messages: [{ role: "system", content: finalSystemPrompt }, ...messages], model: modelName, stream: true, temperature: 0.7, max_tokens: parseInt(maxTokens) || 4096 };
         }
 
         const response = await fetch(apiUrl, { method: "POST", headers, body: JSON.stringify(body), signal: controller.signal });
@@ -82,9 +59,14 @@ export default async function handler(req) {
 
         if (response.ok) {
           const reader = response.body.getReader();
+          const encoder = new TextEncoder();
           const decoder = new TextDecoder();
+
           return new Response(new ReadableStream({
             async start(controller) {
+              // ★ ストリームの最初に「どのAIか」をタグで送る
+              controller.enqueue(encoder.encode(`[:model:${provider.name}:]`));
+
               let buffer = "";
               while (true) {
                 const { done, value } = await reader.read();
@@ -93,7 +75,7 @@ export default async function handler(req) {
                 if (provider.type === 'gemini') {
                   const matches = buffer.match(/"text":\s*"((?:[^"\\]|\\.)*)"/g);
                   if (matches) {
-                    matches.forEach(m => { try { const t = JSON.parse(`{${m}}`).text; controller.enqueue(new TextEncoder().encode(t)); } catch(e){} });
+                    matches.forEach(m => { try { const t = JSON.parse(`{${m}}`).text; controller.enqueue(encoder.encode(t)); } catch(e){} });
                     buffer = "";
                   }
                 } else {
@@ -102,7 +84,7 @@ export default async function handler(req) {
                   for (const line of lines) {
                     const l = line.trim();
                     if (l.startsWith("data: ") && l !== "data: [DONE]") {
-                      try { const content = JSON.parse(l.substring(6)).choices[0]?.delta?.content || ""; if (content) controller.enqueue(new TextEncoder().encode(content)); } catch (e) {}
+                      try { const content = JSON.parse(l.substring(6)).choices[0]?.delta?.content || ""; if (content) controller.enqueue(encoder.encode(content)); } catch (e) {}
                     }
                   }
                 }
@@ -119,7 +101,7 @@ export default async function handler(req) {
         continue;
       }
     }
-    return new Response(JSON.stringify({ error: `全回線が混雑中だみつ... (${lastError})` }), { status: 429 });
+    return new Response(JSON.stringify({ error: `混雑中 (${lastError})` }), { status: 429 });
   } catch (error) {
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
